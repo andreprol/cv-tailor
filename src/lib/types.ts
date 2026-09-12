@@ -70,3 +70,19 @@ export interface Application {
   applied_at: string
   created_at: string
 }
+
+export interface CvVersion {
+  id: string
+  application_id: string
+  storage_path: string
+  generated_json: unknown
+  created_at: string
+}
+
+export interface InterviewQuestion {
+  id: string
+  application_id: string
+  question: string
+  rationale: string
+  created_at: string
+}
