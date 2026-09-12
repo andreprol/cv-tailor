@@ -21,14 +21,13 @@ export async function generateCvAction(
 ): Promise<GenerateCvState> {
   const editedJobDescription = String(formData.get('jobDescriptionRaw') ?? '').trim()
   const db = createServiceClient()
-
-  if (editedJobDescription.length > 0) {
-    await repo.updateJobDescription(db, applicationId, editedJobDescription)
-  }
-
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
+    if (editedJobDescription.length > 0) {
+      await repo.updateJobDescription(db, applicationId, editedJobDescription)
+    }
+
     await runCvGeneration(
       {
         getApplication: (id) => repo.getApplication(db, id),
