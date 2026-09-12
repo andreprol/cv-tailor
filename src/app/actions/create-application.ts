@@ -6,20 +6,37 @@ import { createApplication } from '@/lib/repository'
 import { fetchJobDescription } from '@/lib/extract-job-text'
 import { DEFAULT_USER_ID } from '@/lib/constants'
 
-export async function createApplicationAction(formData: FormData): Promise<void> {
+export interface CreateApplicationState {
+  error: string | null
+  company: string
+  roleTitle: string
+  sourceUrl: string
+  jobDescriptionRaw: string
+}
+
+export async function createApplicationAction(
+  _prevState: CreateApplicationState,
+  formData: FormData,
+): Promise<CreateApplicationState> {
   const company = String(formData.get('company') ?? '')
   const roleTitle = String(formData.get('roleTitle') ?? '')
-  const sourceUrl = String(formData.get('sourceUrl') ?? '').trim() || null
+  const sourceUrl = String(formData.get('sourceUrl') ?? '').trim()
   const pastedText = String(formData.get('jobDescriptionRaw') ?? '').trim()
 
   const jobDescriptionRaw = sourceUrl ? (await fetchJobDescription(sourceUrl)) ?? pastedText : pastedText
 
   if (!jobDescriptionRaw) {
-    throw new Error('Nao foi possivel extrair o texto da vaga do link, e nenhum texto foi colado. Cole o texto da vaga manualmente.')
+    return {
+      error: 'Nao foi possivel extrair o texto da vaga do link, e nenhum texto foi colado. Cole o texto da vaga manualmente.',
+      company,
+      roleTitle,
+      sourceUrl,
+      jobDescriptionRaw: pastedText,
+    }
   }
 
   const db = createServiceClient()
-  const application = await createApplication(db, DEFAULT_USER_ID, { company, roleTitle, sourceUrl, jobDescriptionRaw })
+  const application = await createApplication(db, DEFAULT_USER_ID, { company, roleTitle, sourceUrl: sourceUrl || null, jobDescriptionRaw })
 
   redirect(`/applications/${application.id}`)
 }
