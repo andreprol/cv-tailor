@@ -10,6 +10,8 @@ const profile: Profile = {
 }
 
 const content: GeneratedCv = {
+  sufficientMatch: true,
+  matchWarning: null,
   headline: 'Technical Program Manager',
   summary: 'Summary text for this role.',
   selectedAchievements: [

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import Anthropic from '@anthropic-ai/sdk'
 import { createServiceClient } from '../src/lib/supabase/server'
 import { DEFAULT_USER_ID } from '../src/lib/constants'
+import { stripMarkdownFence } from '../src/lib/strip-markdown-fence'
 
 const CV_PATHS = [
   'F:/Particular/CV/CV_Andre_Prol_TCS_AI_TPM.pdf',
@@ -17,11 +18,6 @@ Copie o texto do bullet LITERALMENTE, sem reescrever. "positioning" e um array c
 // namespace (`anthropic.beta.messages.create()`) with the `pdfs-2024-09-25`
 // beta flag; the `{ type: 'document', source: { type: 'base64', media_type:
 // 'application/pdf', data } }` shape itself is unchanged from the task spec.
-function stripMarkdownFence(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-  return fenced ? fenced[1] : text
-}
-
 async function importOneCv(anthropic: Anthropic, path: string) {
   const fileBuffer = readFileSync(path)
   const response = await anthropic.beta.messages.create({
