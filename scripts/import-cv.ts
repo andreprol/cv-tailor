@@ -17,11 +17,24 @@ Copie o texto do bullet LITERALMENTE, sem reescrever. "positioning" e um array c
 // namespace (`anthropic.beta.messages.create()`) with the `pdfs-2024-09-25`
 // beta flag; the `{ type: 'document', source: { type: 'base64', media_type:
 // 'application/pdf', data } }` shape itself is unchanged from the task spec.
+function stripMarkdownFence(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  return fenced ? fenced[1] : text
+}
+
 async function importOneCv(anthropic: Anthropic, path: string) {
   const fileBuffer = readFileSync(path)
   const response = await anthropic.beta.messages.create({
     model: 'claude-sonnet-5',
-    max_tokens: 8192,
+    // claude-sonnet-5 uses extended thinking by default; a CV-sized extraction
+    // burned ~5.1k thinking tokens before even starting the JSON answer in
+    // testing (usage.output_tokens_details.thinking_tokens), so 8192 was too
+    // low and truncated the response mid-thought with zero text ever emitted
+    // (stop_reason: 'max_tokens', content[0].type: 'thinking', no text block
+    // at all) — which importOneCv's old code silently treated as '{}' instead
+    // of failing loudly. 16000 leaves real headroom above the ~9.5k tokens
+    // (thinking + text) this CV actually used.
+    max_tokens: 16000,
     betas: ['pdfs-2024-09-25'],
     messages: [{
       role: 'user',
@@ -31,8 +44,13 @@ async function importOneCv(anthropic: Anthropic, path: string) {
       ],
     }],
   })
-  const block = response.content[0]
-  const text = block.type === 'text' ? block.text : '{}'
+  const textBlock = response.content.find((block): block is Anthropic.Beta.BetaTextBlock => block.type === 'text')
+  if (!textBlock) {
+    throw new Error(`Claude nao retornou nenhum bloco de texto (stop_reason: ${response.stop_reason}). Blocos recebidos: ${response.content.map((b) => b.type).join(', ')}`)
+  }
+  // Despite the prompt's "Responda APENAS com o JSON", the model sometimes
+  // wraps the answer in a ```json ... ``` fence anyway — strip it before parsing.
+  const text = stripMarkdownFence(textBlock.text)
   try {
     return JSON.parse(text)
   } catch (error) {
