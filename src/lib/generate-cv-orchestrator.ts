@@ -21,6 +21,10 @@ export async function runCvGeneration(deps: GenerateCvDeps, applicationId: strin
   }
 
   const generated = await deps.generateTailoredCv(masterData, application.job_description_raw)
+  if (generated.selectedAchievements.length === 0) {
+    throw new Error('Nenhuma conquista do banco mestre e relevante pra essa vaga especifica. Adicione conquistas relacionadas antes de gerar (ou confirme que essa vaga realmente nao combina com o seu perfil atual).')
+  }
+
   const profile = await deps.getProfile()
   const docxBuffer = await deps.renderCvDocx(profile, generated)
   const storagePath = await deps.uploadCvDocx(applicationId, docxBuffer)

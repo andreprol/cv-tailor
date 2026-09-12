@@ -9,7 +9,7 @@ function makeDeps(overrides: Partial<GenerateCvDeps> = {}): GenerateCvDeps {
     }),
     getProfile: vi.fn().mockResolvedValue({ full_name: 'André Prol' }),
     generateTailoredCv: vi.fn().mockResolvedValue({
-      headline: 'TPM', summary: 'S', selectedAchievements: [], keywords: [], interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
+      headline: 'TPM', summary: 'S', selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real' }], keywords: [], interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
     }),
     renderCvDocx: vi.fn().mockResolvedValue(Buffer.from('docx-bytes')),
     uploadCvDocx: vi.fn().mockResolvedValue('app-1.docx'),
@@ -44,6 +44,17 @@ describe('runCvGeneration', () => {
     const deps = makeDeps({ generateTailoredCv: vi.fn().mockRejectedValue(new Error('Claude failed twice')) })
 
     await expect(runCvGeneration(deps, 'app-1')).rejects.toThrow('Claude failed twice')
+    expect(deps.uploadCvDocx).not.toHaveBeenCalled()
+  })
+
+  it('throws when Claude finds no relevant achievements for this posting', async () => {
+    const deps = makeDeps({
+      generateTailoredCv: vi.fn().mockResolvedValue({
+        headline: 'X', summary: 'Y', selectedAchievements: [], keywords: [], interviewQuestions: [],
+      }),
+    })
+
+    await expect(runCvGeneration(deps, 'app-1')).rejects.toThrow(/relevante/)
     expect(deps.uploadCvDocx).not.toHaveBeenCalled()
   })
 })

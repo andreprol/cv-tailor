@@ -63,11 +63,15 @@ export async function updateJobDescription(db: SupabaseClient, applicationId: st
 }
 
 export async function saveCvVersion(db: SupabaseClient, applicationId: string, storagePath: string, generatedJson: unknown): Promise<void> {
+  const { error: deleteError } = await db.from('cv_versions').delete().eq('application_id', applicationId)
+  if (deleteError) throw deleteError
   const { error } = await db.from('cv_versions').insert({ application_id: applicationId, storage_path: storagePath, generated_json: generatedJson })
   if (error) throw error
 }
 
 export async function saveInterviewQuestions(db: SupabaseClient, applicationId: string, questions: { question: string; rationale: string }[]): Promise<void> {
+  const { error: deleteError } = await db.from('interview_questions').delete().eq('application_id', applicationId)
+  if (deleteError) throw deleteError
   const rows = questions.map((q) => ({ application_id: applicationId, question: q.question, rationale: q.rationale }))
   const { error } = await db.from('interview_questions').insert(rows)
   if (error) throw error
