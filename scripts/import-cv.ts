@@ -33,40 +33,59 @@ async function importOneCv(anthropic: Anthropic, path: string) {
   })
   const block = response.content[0]
   const text = block.type === 'text' ? block.text : '{}'
-  return JSON.parse(text)
+  try {
+    return JSON.parse(text)
+  } catch (error) {
+    console.error('Resposta do Claude nao era JSON valido:', text)
+    throw error
+  }
 }
 
 async function main() {
+  // tsx does not auto-load .env files, and this reads only from .env.local
+  // (not .env) so it matches Task 2's setup, where credentials live only there.
+  // Must run before anything below reads process.env — createServiceClient()
+  // and the Anthropic constructor both read their env vars lazily inside this
+  // function body (not at module import time), so calling it here as the
+  // first statement of main() is sufficient; it doesn't need to precede the
+  // (hoisted) import statements above.
+  process.loadEnvFile('.env.local')
+
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const db = createServiceClient()
 
   for (const path of CV_PATHS) {
     console.log(`Importando ${path}...`)
     const extracted = await importOneCv(anthropic, path)
+    console.log('Extraido:', JSON.stringify(extracted, null, 2))
 
     if (extracted.achievements?.length) {
-      await db.from('achievements').insert(extracted.achievements.map((a: any) => ({
+      const { error } = await db.from('achievements').insert(extracted.achievements.map((a: any) => ({
         user_id: DEFAULT_USER_ID, company: a.company, role_title: a.roleTitle,
         start_date: a.startDate, end_date: a.endDate, bullet: a.bullet, metric: a.metric, positioning: a.positioning,
       })))
+      if (error) throw new Error(`Falha ao inserir achievements: ${error.message}`)
     }
     if (extracted.skills?.length) {
-      await db.from('skills').insert(extracted.skills.map((s: any) => ({
+      const { error } = await db.from('skills').insert(extracted.skills.map((s: any) => ({
         user_id: DEFAULT_USER_ID, name: s.name, category: s.category, positioning: s.positioning,
       })))
+      if (error) throw new Error(`Falha ao inserir skills: ${error.message}`)
     }
     if (extracted.education?.length) {
-      await db.from('education').insert(extracted.education.map((e: any) => ({
+      const { error } = await db.from('education').insert(extracted.education.map((e: any) => ({
         user_id: DEFAULT_USER_ID, institution: e.institution, degree: e.degree,
         completed_on: e.completedOn, in_progress: e.inProgress, positioning: e.positioning,
       })))
+      if (error) throw new Error(`Falha ao inserir education: ${error.message}`)
     }
     if (extracted.certifications?.length) {
-      await db.from('certifications').insert(extracted.certifications.map((c: any) => ({
+      const { error } = await db.from('certifications').insert(extracted.certifications.map((c: any) => ({
         user_id: DEFAULT_USER_ID, name: c.name, issuer: c.issuer, issued_on: c.issuedOn, positioning: c.positioning,
       })))
+      if (error) throw new Error(`Falha ao inserir certifications: ${error.message}`)
     }
-    console.log(`OK: ${extracted.achievements?.length ?? 0} achievements, ${extracted.skills?.length ?? 0} skills importados.`)
+    console.log(`OK: ${extracted.achievements?.length ?? 0} achievements, ${extracted.skills?.length ?? 0} skills, ${extracted.education?.length ?? 0} education, ${extracted.certifications?.length ?? 0} certifications importados.`)
   }
 }
 
