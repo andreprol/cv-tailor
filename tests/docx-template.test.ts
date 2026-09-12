@@ -46,4 +46,19 @@ describe('renderCvDocx', () => {
     expect(xml).toContain('Technical Program Manager')
     expect(xml).toContain('andreprol@andreprol.com.br')
   })
+
+  it('properly escapes special characters in bullet text', async () => {
+    const testContent: GeneratedCv = {
+      ...content,
+      selectedAchievements: [
+        { company: 'Test Co.', roleTitle: 'Role & Title', bullet: 'Reduced cost by <5%> & saved time.' },
+      ],
+    }
+    const xml = await documentXmlOf(await renderCvDocx(profile, testContent))
+    // Raw special characters must never appear unescaped in the XML text nodes.
+    expect(xml).not.toContain('<5%>')
+    // docx escapes via its XML builder, not string concatenation — verify the exact encoded form.
+    expect(xml).toContain('Role &amp; Title')
+    expect(xml).toContain('- Reduced cost by &lt;5%&gt; &amp; saved time.')
+  })
 })
