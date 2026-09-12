@@ -1207,7 +1207,9 @@ git commit -m "feat(cv-tailor): add best-effort job posting extraction from a UR
 - Create: `cv-tailor/src/app/actions/generate-cv.ts`
 - Create: `cv-tailor/src/app/actions/update-status.ts`
 
-No new automated tests here — these files only wire already-tested pieces (Tasks 5-9) to real Supabase/Anthropic clients via `runCvGeneration`'s dependency interface. Verified end-to-end in Task 13.
+No new automated tests here — these files only wire already-tested pieces (Tasks 5-9) to real Supabase/Anthropic clients via `runCvGeneration`'s dependency interface. Verified end-to-end in Task 14.
+
+**Amended during implementation review:** the two code blocks below were revised from the original draft to fix a real, previously-documented Next.js pitfall — a thrown `Error` from a Server Action has its message redacted in production (only a digest survives; see project memory `feedback_next_erro_producao_digest.md`). Both `createApplicationAction` and `generateCvAction` now return their expected/instructional failures as typed state (the `useActionState` pattern) instead of throwing, so the guidance text actually reaches the user. `redirect()` is never wrapped in a try/catch (it throws internally to work). This is the actual, final, committed version — build/tests verified green.
 
 - [ ] **Step 1: Create `src/app/actions/create-application.ts`**
 
@@ -1220,24 +1222,43 @@ import { createApplication } from '@/lib/repository'
 import { fetchJobDescription } from '@/lib/extract-job-text'
 import { DEFAULT_USER_ID } from '@/lib/constants'
 
-export async function createApplicationAction(formData: FormData): Promise<void> {
+export interface CreateApplicationState {
+  error: string | null
+  company: string
+  roleTitle: string
+  sourceUrl: string
+  jobDescriptionRaw: string
+}
+
+export async function createApplicationAction(
+  _prevState: CreateApplicationState,
+  formData: FormData,
+): Promise<CreateApplicationState> {
   const company = String(formData.get('company') ?? '')
   const roleTitle = String(formData.get('roleTitle') ?? '')
-  const sourceUrl = String(formData.get('sourceUrl') ?? '').trim() || null
+  const sourceUrl = String(formData.get('sourceUrl') ?? '').trim()
   const pastedText = String(formData.get('jobDescriptionRaw') ?? '').trim()
 
   const jobDescriptionRaw = sourceUrl ? (await fetchJobDescription(sourceUrl)) ?? pastedText : pastedText
 
   if (!jobDescriptionRaw) {
-    throw new Error('Nao foi possivel extrair o texto da vaga do link, e nenhum texto foi colado. Cole o texto da vaga manualmente.')
+    return {
+      error: 'Nao foi possivel extrair o texto da vaga do link, e nenhum texto foi colado. Cole o texto da vaga manualmente.',
+      company,
+      roleTitle,
+      sourceUrl,
+      jobDescriptionRaw: pastedText,
+    }
   }
 
   const db = createServiceClient()
-  const application = await createApplication(db, DEFAULT_USER_ID, { company, roleTitle, sourceUrl, jobDescriptionRaw })
+  const application = await createApplication(db, DEFAULT_USER_ID, { company, roleTitle, sourceUrl: sourceUrl || null, jobDescriptionRaw })
 
   redirect(`/applications/${application.id}`)
 }
 ```
+
+No try/catch here: the one expected-error path returns early as state, before anything risky runs; `redirect()` is the only thing that throws, and nothing catches it.
 
 - [ ] **Step 2: Create `src/app/actions/generate-cv.ts`**
 
@@ -1254,32 +1275,47 @@ import { uploadCvDocx } from '@/lib/storage'
 import { runCvGeneration } from '@/lib/generate-cv-orchestrator'
 import { DEFAULT_USER_ID } from '@/lib/constants'
 
-export async function generateCvAction(applicationId: string, editedJobDescription: string): Promise<void> {
+export interface GenerateCvState {
+  error: string | null
+}
+
+export async function generateCvAction(
+  applicationId: string,
+  _prevState: GenerateCvState,
+  formData: FormData,
+): Promise<GenerateCvState> {
+  const editedJobDescription = String(formData.get('jobDescriptionRaw') ?? '').trim()
   const db = createServiceClient()
-
-  if (editedJobDescription.trim().length > 0) {
-    await repo.updateJobDescription(db, applicationId, editedJobDescription.trim())
-  }
-
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-  await runCvGeneration(
-    {
-      getApplication: (id) => repo.getApplication(db, id),
-      getMasterDataBank: () => repo.getMasterDataBank(db, DEFAULT_USER_ID),
-      getProfile: () => repo.getProfile(db, DEFAULT_USER_ID),
-      generateTailoredCv: (masterData, jobDescription) => generateTailoredCv(anthropic, masterData, jobDescription),
-      renderCvDocx: (profile, content) => renderCvDocx(profile, content),
-      uploadCvDocx: (id, buffer) => uploadCvDocx(db, id, buffer),
-      saveCvVersion: (id, storagePath, generatedJson) => repo.saveCvVersion(db, id, storagePath, generatedJson),
-      saveInterviewQuestions: (id, questions) => repo.saveInterviewQuestions(db, id, questions),
-    },
-    applicationId,
-  )
+  try {
+    if (editedJobDescription.length > 0) {
+      await repo.updateJobDescription(db, applicationId, editedJobDescription)
+    }
+
+    await runCvGeneration(
+      {
+        getApplication: (id) => repo.getApplication(db, id),
+        getMasterDataBank: () => repo.getMasterDataBank(db, DEFAULT_USER_ID),
+        getProfile: () => repo.getProfile(db, DEFAULT_USER_ID),
+        generateTailoredCv: (masterData, jobDescription) => generateTailoredCv(anthropic, masterData, jobDescription),
+        renderCvDocx: (profile, content) => renderCvDocx(profile, content),
+        uploadCvDocx: (id, buffer) => uploadCvDocx(db, id, buffer),
+        saveCvVersion: (id, storagePath, generatedJson) => repo.saveCvVersion(db, id, storagePath, generatedJson),
+        saveInterviewQuestions: (id, questions) => repo.saveInterviewQuestions(db, id, questions),
+      },
+      applicationId,
+    )
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Erro desconhecido ao gerar o CV.' }
+  }
 
   revalidatePath(`/applications/${applicationId}`)
+  return { error: null }
 }
 ```
+
+This function has no `redirect()` call, so wrapping it in try/catch is safe — both `updateJobDescription` and `runCvGeneration` failures (including the orchestrator's own "Banco mestre vazio" guard) surface as readable state instead of a production-redacted digest.
 
 - [ ] **Step 3: Create `src/app/actions/update-status.ts`**
 
@@ -1310,51 +1346,97 @@ git commit -m "feat(cv-tailor): wire server actions for application intake, gene
 
 ### Task 11: Ingestion page and application detail page
 
+**Amended during implementation review:** revised to consume the `useActionState`-based action signatures from the amended Task 10. `new/page.tsx` is now a Client Component (required by the `useActionState` hook). The detail page stays a Server Component for its data fetching, but the "generate CV" form is split into its own Client Component (`generate-cv-form.tsx`) since only that one piece needs `useActionState` — the status-update form has no user-facing "instruction" error to preserve, so it stays a plain inline server action, unchanged from the original draft.
+
 **Files:**
 - Create: `cv-tailor/src/app/applications/new/page.tsx`
 - Create: `cv-tailor/src/app/applications/[id]/page.tsx`
+- Create: `cv-tailor/src/app/applications/[id]/generate-cv-form.tsx`
 
 - [ ] **Step 1: Create `src/app/applications/new/page.tsx`**
 
 ```tsx
-import { createApplicationAction } from '@/app/actions/create-application'
+'use client'
+
+import { useActionState } from 'react'
+import { createApplicationAction, type CreateApplicationState } from '@/app/actions/create-application'
+
+const initialState: CreateApplicationState = { error: null, company: '', roleTitle: '', sourceUrl: '', jobDescriptionRaw: '' }
 
 export default function NewApplicationPage() {
+  const [state, formAction, pending] = useActionState(createApplicationAction, initialState)
+
   return (
     <main style={{ padding: 24, maxWidth: 640 }}>
       <h1>Nova candidatura</h1>
-      <form action={createApplicationAction}>
+      {state.error && <p role="alert" style={{ color: 'crimson' }}>{state.error}</p>}
+      <form action={formAction}>
         <label>
           Empresa
-          <input name="company" required style={{ display: 'block', width: '100%' }} />
+          <input name="company" required defaultValue={state.company} style={{ display: 'block', width: '100%' }} />
         </label>
         <label>
           Cargo (titulo exato da vaga)
-          <input name="roleTitle" required style={{ display: 'block', width: '100%' }} />
+          <input name="roleTitle" required defaultValue={state.roleTitle} style={{ display: 'block', width: '100%' }} />
         </label>
         <label>
           Link da vaga (opcional)
-          <input name="sourceUrl" type="url" style={{ display: 'block', width: '100%' }} />
+          <input name="sourceUrl" type="url" defaultValue={state.sourceUrl} style={{ display: 'block', width: '100%' }} />
         </label>
         <label>
           Ou cole o texto da vaga aqui (obrigatorio se o link nao puder ser lido)
-          <textarea name="jobDescriptionRaw" rows={10} style={{ display: 'block', width: '100%' }} />
+          <textarea name="jobDescriptionRaw" rows={10} defaultValue={state.jobDescriptionRaw} style={{ display: 'block', width: '100%' }} />
         </label>
-        <button type="submit">Continuar</button>
+        <button type="submit" disabled={pending}>{pending ? 'Enviando...' : 'Continuar'}</button>
       </form>
     </main>
   )
 }
 ```
 
-- [ ] **Step 2: Create `src/app/applications/[id]/page.tsx`**
+`defaultValue={state.company}` etc. re-populate every field from the last submission, including on the error path — React clears uncontrolled fields after any action, so echoing the submitted values back through `state` is what keeps the user's typed text from vanishing when they hit the "paste the text manually" instruction.
+
+- [ ] **Step 2: Create `src/app/applications/[id]/generate-cv-form.tsx`**
+
+```tsx
+'use client'
+
+import { useActionState } from 'react'
+import { generateCvAction, type GenerateCvState } from '@/app/actions/generate-cv'
+
+const initialState: GenerateCvState = { error: null }
+
+export function GenerateCvForm({
+  applicationId,
+  initialJobDescription,
+  hasCv,
+}: {
+  applicationId: string
+  initialJobDescription: string
+  hasCv: boolean
+}) {
+  const [state, formAction, pending] = useActionState(generateCvAction.bind(null, applicationId), initialState)
+
+  return (
+    <form action={formAction}>
+      {state.error && <p role="alert" style={{ color: 'crimson' }}>{state.error}</p>}
+      <textarea name="jobDescriptionRaw" rows={12} style={{ display: 'block', width: '100%' }} defaultValue={initialJobDescription} />
+      <button type="submit" disabled={pending}>{pending ? 'Gerando...' : hasCv ? 'Gerar de novo' : 'Gerar CV'}</button>
+    </form>
+  )
+}
+```
+
+`generateCvAction.bind(null, applicationId)` binds the route's dynamic `id` into the server action reference before handing it to `useActionState`, which otherwise only knows how to pass `(state, formData)`.
+
+- [ ] **Step 3: Create `src/app/applications/[id]/page.tsx`**
 
 ```tsx
 import { createServiceClient } from '@/lib/supabase/server'
 import { getApplicationDetail } from '@/lib/repository'
 import { getCvDownloadUrl } from '@/lib/storage'
-import { generateCvAction } from '@/app/actions/generate-cv'
 import { updateStatusAction } from '@/app/actions/update-status'
+import { GenerateCvForm } from './generate-cv-form'
 import type { ApplicationStatus } from '@/lib/types'
 
 const STATUS_OPTIONS: ApplicationStatus[] = ['sem_resposta', 'rejeitado', 'entrevista', 'oferta']
@@ -1362,11 +1444,7 @@ const STATUS_OPTIONS: ApplicationStatus[] = ['sem_resposta', 'rejeitado', 'entre
 export default async function ApplicationDetailPage({ params }: { params: { id: string } }) {
   const db = createServiceClient()
   const { application, cvVersion, interviewQuestions } = await getApplicationDetail(db, params.id)
-
-  async function regenerate(formData: FormData) {
-    'use server'
-    await generateCvAction(params.id, String(formData.get('jobDescriptionRaw') ?? ''))
-  }
+  const downloadUrl = cvVersion ? await getCvDownloadUrl(db, cvVersion.storage_path) : null
 
   async function setStatus(formData: FormData) {
     'use server'
@@ -1385,19 +1463,16 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
       </form>
 
       <h2>Texto da vaga (confira antes de gerar)</h2>
-      <form action={regenerate}>
-        <textarea name="jobDescriptionRaw" rows={12} style={{ display: 'block', width: '100%' }} defaultValue={application.job_description_raw} />
-        <button type="submit">{cvVersion ? 'Gerar de novo' : 'Gerar CV'}</button>
-      </form>
+      <GenerateCvForm applicationId={application.id} initialJobDescription={application.job_description_raw} hasCv={cvVersion !== null} />
 
-      {cvVersion && (
+      {cvVersion && downloadUrl && (
         <>
           <h2>CV gerado</h2>
-          <DownloadLink db={db} storagePath={cvVersion.storage_path} />
+          <a href={downloadUrl}>Baixar CV (.docx)</a>
 
           <h2>Perguntas provaveis de entrevista</h2>
           <ul>
-            {interviewQuestions.map((q: { id: string; question: string; rationale: string }) => (
+            {interviewQuestions.map((q) => (
               <li key={q.id}><strong>{q.question}</strong> — {q.rationale}</li>
             ))}
           </ul>
@@ -1406,19 +1481,14 @@ export default async function ApplicationDetailPage({ params }: { params: { id: 
     </main>
   )
 }
-
-async function DownloadLink({ db, storagePath }: { db: ReturnType<typeof createServiceClient>; storagePath: string }) {
-  const url = await getCvDownloadUrl(db, storagePath)
-  return <a href={url}>Baixar CV (.docx)</a>
-}
 ```
 
-- [ ] **Step 3: Verify it builds**
+- [ ] **Step 4: Verify it builds**
 
 Run: `npm run build`
 Expected: `Compiled successfully` (build-time type check; the pages read `process.env` only at request time, so no `.env.local` is required for the build itself).
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add cv-tailor/src/app/applications
