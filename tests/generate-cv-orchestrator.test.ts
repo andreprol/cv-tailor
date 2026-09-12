@@ -9,6 +9,7 @@ function makeDeps(overrides: Partial<GenerateCvDeps> = {}): GenerateCvDeps {
     }),
     getProfile: vi.fn().mockResolvedValue({ full_name: 'André Prol' }),
     generateTailoredCv: vi.fn().mockResolvedValue({
+      sufficientMatch: true, matchWarning: null,
       headline: 'TPM', summary: 'S', selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real' }], keywords: [], interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
     }),
     renderCvDocx: vi.fn().mockResolvedValue(Buffer.from('docx-bytes')),
@@ -50,11 +51,31 @@ describe('runCvGeneration', () => {
   it('throws when Claude finds no relevant achievements for this posting', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
+        sufficientMatch: false, matchWarning: null,
         headline: 'X', summary: 'Y', selectedAchievements: [], keywords: [], interviewQuestions: [],
       }),
     })
 
     await expect(runCvGeneration(deps, 'app-1')).rejects.toThrow(/relevante/)
     expect(deps.uploadCvDocx).not.toHaveBeenCalled()
+  })
+
+  it('throws with the model\'s own matchWarning when it picked real-but-irrelevant achievements for a mismatched vaga (real bug: a Web3 posting against a TPM-only bank got 3 real, verbatim, but topically irrelevant achievements selected, and the model wrote its honest "this is not a good fit" assessment into the résumé\'s own summary field instead of blocking)', async () => {
+    const deps = makeDeps({
+      generateTailoredCv: vi.fn().mockResolvedValue({
+        sufficientMatch: false,
+        matchWarning: 'Banco de dados nao tem experiencia real em Rust/Solidity/Soroban, exigidos pela vaga.',
+        headline: 'Soroban Smart Contract Developer',
+        summary: 'Some summary the model still filled in',
+        selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real but unrelated to Web3' }],
+        keywords: [],
+        interviewQuestions: [],
+      }),
+    })
+
+    await expect(runCvGeneration(deps, 'app-1')).rejects.toThrow(/Rust\/Solidity\/Soroban/)
+    expect(deps.renderCvDocx).not.toHaveBeenCalled()
+    expect(deps.uploadCvDocx).not.toHaveBeenCalled()
+    expect(deps.saveCvVersion).not.toHaveBeenCalled()
   })
 })

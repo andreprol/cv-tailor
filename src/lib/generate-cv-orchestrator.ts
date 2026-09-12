@@ -24,6 +24,15 @@ export async function runCvGeneration(deps: GenerateCvDeps, applicationId: strin
   if (generated.selectedAchievements.length === 0) {
     throw new Error('Nenhuma conquista do banco mestre e relevante pra essa vaga especifica. Adicione conquistas relacionadas antes de gerar (ou confirme que essa vaga realmente nao combina com o seu perfil atual).')
   }
+  // Real testing showed the model can still pick a few technically-real
+  // achievements (passing the check above) for a vaga that doesn't actually
+  // match — e.g. picking generic TPM bullets for a Rust/Soroban role. It
+  // reliably self-reports this via sufficientMatch/matchWarning (see the
+  // prompt), so trust that judgment and block before a misleading résumé
+  // ever gets rendered.
+  if (!generated.sufficientMatch) {
+    throw new Error(generated.matchWarning ?? 'O banco mestre nao cobre os requisitos tecnicos centrais dessa vaga.')
+  }
 
   const profile = await deps.getProfile()
   const docxBuffer = await deps.renderCvDocx(profile, generated)
