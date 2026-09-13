@@ -33,6 +33,14 @@ export default function NewApplicationPage() {
       // (direct selection, as opposed to the paste path) — clear it so it
       // never ends up in the form's FormData on submit.
       if (fileInputRef.current) fileInputRef.current.value = ''
+      // Also clear any preview from an earlier, valid selection — otherwise
+      // a good-file-then-oversized-file sequence (mixing the file input and
+      // paste paths) leaves a thumbnail on screen for an image that is no
+      // longer actually attached to the form.
+      setPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev)
+        return null
+      })
       return
     }
     setImageError(null)
