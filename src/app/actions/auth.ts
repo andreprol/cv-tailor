@@ -9,7 +9,7 @@ export interface AuthActionState {
   message: string | null
 }
 
-async function getOrigin(): Promise<string> {
+export async function getOrigin(): Promise<string> {
   if (process.env.NEXT_PUBLIC_SITE_URL) {
     return process.env.NEXT_PUBLIC_SITE_URL
   }
