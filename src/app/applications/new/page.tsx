@@ -1,13 +1,37 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState } from 'react'
+import { useActionState, useRef, useState } from 'react'
 import { createApplicationAction, type CreateApplicationState } from '@/app/actions/create-application'
 
 const initialState: CreateApplicationState = { error: null, company: '', roleTitle: '', sourceUrl: '', jobDescriptionRaw: '' }
 
 export default function NewApplicationPage() {
   const [state, formAction, pending] = useActionState(createApplicationAction, initialState)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  function setImageFile(file: File | null) {
+    if (!file) {
+      setPreviewUrl(null)
+      return
+    }
+    const dataTransfer = new DataTransfer()
+    dataTransfer.items.add(file)
+    if (fileInputRef.current) {
+      fileInputRef.current.files = dataTransfer.files
+    }
+    setPreviewUrl(URL.createObjectURL(file))
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLDivElement>) {
+    const item = Array.from(event.clipboardData.items).find((i) => i.type.startsWith('image/'))
+    if (!item) return
+    const file = item.getAsFile()
+    if (!file) return
+    event.preventDefault()
+    setImageFile(file)
+  }
 
   return (
     <main className="container">
@@ -35,7 +59,27 @@ export default function NewApplicationPage() {
         </div>
 
         <div className="field">
-          <label htmlFor="jobDescriptionRaw">Ou cole o texto da vaga <span className="hint">(obrigatório se o link não puder ser lido)</span></label>
+          <label htmlFor="jobImage">Ou cole/suba um print da vaga <span className="hint">(imagem — opcional)</span></label>
+          <div className="upload-field" onPaste={handlePaste} tabIndex={0}>
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewUrl} alt="Print da vaga colado" style={{ maxHeight: 160, borderRadius: 'var(--radius-md)' }} />
+            ) : (
+              <span>Clique aqui e cole (Ctrl+V) um print, ou escolha um arquivo abaixo</span>
+            )}
+            <input
+              ref={fileInputRef}
+              id="jobImage"
+              name="jobImage"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="jobDescriptionRaw">Ou cole o texto da vaga <span className="hint">(obrigatório se nada acima funcionar)</span></label>
           <textarea id="jobDescriptionRaw" name="jobDescriptionRaw" rows={10} defaultValue={state.jobDescriptionRaw} placeholder="Cole aqui a descrição completa da vaga..." />
         </div>
 
