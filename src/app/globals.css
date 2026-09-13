@@ -414,3 +414,5 @@ select { appearance: none; cursor: pointer; }
 }
 
 .alert-info { background: var(--surface-2); color: var(--text); }
+
+.app-nav { display: flex; gap: var(--space-4); align-items: center; }
