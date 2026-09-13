@@ -38,7 +38,7 @@ export async function signUpWithPasswordAction(_prevState: AuthActionState, form
     options: { emailRedirectTo: `${origin}/auth/callback` },
   })
   if (error) {
-    return { error: error.message, message: null }
+    return { error: 'Nao foi possivel criar a conta. Tente novamente.', message: null }
   }
   return { error: null, message: 'Conta criada. Confira seu email pra confirmar antes de entrar.' }
 }
@@ -53,7 +53,7 @@ export async function signInWithMagicLinkAction(_prevState: AuthActionState, for
     options: { emailRedirectTo: `${origin}/auth/callback` },
   })
   if (error) {
-    return { error: error.message, message: null }
+    return { error: 'Nao foi possivel enviar o link. Tente novamente.', message: null }
   }
   return { error: null, message: 'Link enviado. Confira seu email.' }
 }
@@ -67,7 +67,7 @@ export async function signInWithGoogleAction(_prevState: AuthActionState, _formD
     options: { redirectTo: `${origin}/auth/callback` },
   })
   if (error || !data.url) {
-    return { error: error?.message ?? 'Nao foi possivel iniciar login com Google.', message: null }
+    return { error: 'Nao foi possivel iniciar login com Google.', message: null }
   }
   redirect(data.url)
 }
