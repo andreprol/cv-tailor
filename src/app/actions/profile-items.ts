@@ -42,6 +42,7 @@ export async function deleteProfileItemAction(table: string, id: string): Promis
 
 export interface UpdateProfileItemState {
   error: string | null
+  savedAt: number
 }
 
 export async function updateProfileItemAction(
@@ -56,7 +57,7 @@ export async function updateProfileItemAction(
   try {
     userId = await getCurrentUserId()
   } catch {
-    return { error: 'Sua sessao expirou. Faca login novamente.' }
+    return { error: 'Sua sessao expirou. Faca login novamente.', savedAt: _prevState.savedAt }
   }
 
   const db = createServiceClient()
@@ -71,9 +72,9 @@ export async function updateProfileItemAction(
     await updateProfileItem(db, validTable, id, userId, fields)
   } catch (error) {
     console.error('updateProfileItemAction: falha ao salvar item do perfil:', error)
-    return { error: 'Erro ao salvar. Tente novamente.' }
+    return { error: 'Erro ao salvar. Tente novamente.', savedAt: _prevState.savedAt }
   }
 
   revalidatePath('/perfil')
-  return { error: null }
+  return { error: null, savedAt: Date.now() }
 }

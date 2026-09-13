@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { deleteProfileItemAction, updateProfileItemAction, type UpdateProfileItemState } from '@/app/actions/profile-items'
 import type { Positioning } from '@/lib/types'
+import type { ProfileItemTable } from '@/lib/repository'
 
 export interface ItemField {
   name: string
@@ -19,11 +20,19 @@ export interface ProfileItem {
   fields: ItemField[]
 }
 
-const initialEditState: UpdateProfileItemState = { error: null }
+const initialEditState: UpdateProfileItemState = { error: null, savedAt: 0 }
 
-function ProfileItemRow({ table, item }: { table: string; item: ProfileItem }) {
+function ProfileItemRow({ table, item }: { table: ProfileItemTable; item: ProfileItem }) {
   const [editing, setEditing] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [state, formAction, pending] = useActionState(updateProfileItemAction.bind(null, table, item.id), initialEditState)
+
+  useEffect(() => {
+    if (state.savedAt > 0) {
+      setEditing(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.savedAt])
 
   if (editing) {
     return (
@@ -58,15 +67,22 @@ function ProfileItemRow({ table, item }: { table: string; item: ProfileItem }) {
       </div>
       <div className="profile-item__actions">
         <button type="button" onClick={() => setEditing(true)} className="btn btn-secondary">Editar</button>
-        <form action={deleteProfileItemAction.bind(null, table, item.id)}>
-          <button type="submit" className="btn btn-secondary">Apagar</button>
-        </form>
+        {confirmingDelete ? (
+          <>
+            <form action={deleteProfileItemAction.bind(null, table, item.id)}>
+              <button type="submit" className="btn btn-secondary" style={{ color: 'var(--danger)' }}>Confirmar</button>
+            </form>
+            <button type="button" onClick={() => setConfirmingDelete(false)} className="btn btn-secondary">Cancelar</button>
+          </>
+        ) : (
+          <button type="button" onClick={() => setConfirmingDelete(true)} className="btn btn-secondary">Apagar</button>
+        )}
       </div>
     </div>
   )
 }
 
-export function ProfileItemList({ table, items }: { table: string; items: ProfileItem[] }) {
+export function ProfileItemList({ table, items }: { table: ProfileItemTable; items: ProfileItem[] }) {
   if (items.length === 0) {
     return <p className="hint">Nenhum item ainda.</p>
   }
