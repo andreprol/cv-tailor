@@ -17,9 +17,21 @@ export interface CreateApplicationState {
 }
 
 const VALID_IMAGE_TYPES: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const EXTENSION_TO_MEDIA_TYPE: Record<string, ImageMediaType> = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp',
+}
 
+// Mirrors detectFileKind's convention in upload-cv.ts: trust file.type first
+// (a pasted-from-clipboard image always has one), fall back to the filename
+// extension for the plain <input type="file"> case, where some OS/browser
+// combinations leave file.type empty.
 function detectImageMediaType(file: File): ImageMediaType | null {
-  return (VALID_IMAGE_TYPES as string[]).includes(file.type) ? (file.type as ImageMediaType) : null
+  if ((VALID_IMAGE_TYPES as string[]).includes(file.type)) {
+    return file.type as ImageMediaType
+  }
+  const name = file.name.toLowerCase()
+  const extension = Object.keys(EXTENSION_TO_MEDIA_TYPE).find((ext) => name.endsWith(ext))
+  return extension ? EXTENSION_TO_MEDIA_TYPE[extension] : null
 }
 
 export async function createApplicationAction(

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { createApplicationAction, type CreateApplicationState } from '@/app/actions/create-application'
 
 const initialState: CreateApplicationState = { error: null, company: '', roleTitle: '', sourceUrl: '', jobDescriptionRaw: '' }
@@ -11,17 +11,25 @@ export default function NewApplicationPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
-  function setImageFile(file: File | null) {
-    if (!file) {
-      setPreviewUrl(null)
-      return
+  // Revoke on unmount too, not just on replacement — otherwise navigating
+  // away from this page mid-preview leaks the blob URL for the tab's life.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
     }
+  }, [previewUrl])
+
+  function setImageFile(file: File | null) {
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return file ? URL.createObjectURL(file) : null
+    })
+    if (!file) return
     const dataTransfer = new DataTransfer()
     dataTransfer.items.add(file)
     if (fileInputRef.current) {
       fileInputRef.current.files = dataTransfer.files
     }
-    setPreviewUrl(URL.createObjectURL(file))
   }
 
   function handlePaste(event: React.ClipboardEvent<HTMLDivElement>) {
