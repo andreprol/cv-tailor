@@ -83,10 +83,6 @@ export function UploadCvForm() {
       setFormError('Selecione ao menos um CV (PDF ou DOCX).')
       return
     }
-    if (positioning.length === 0) {
-      setFormError('Marque pelo menos um posicionamento (TPM, AI Product ou Web3).')
-      return
-    }
 
     setFormError(null)
     const batch = files
@@ -163,7 +159,7 @@ export function UploadCvForm() {
       </div>
 
       <div className="field" style={{ marginTop: 'var(--space-4)' }}>
-        <span className="hint">Esses CVs são pra qual posicionamento? (marque 1 ou mais — vale pra todos os arquivos selecionados)</span>
+        <span className="hint">Esses CVs são pra qual posicionamento? <span style={{ fontWeight: 400 }}>(opcional — marque se quiser, vale pra todos os arquivos selecionados)</span></span>
         <div className="checkbox-row">
           {POSITIONING_OPTIONS.map((option) => (
             <label key={option}>

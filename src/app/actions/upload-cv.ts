@@ -65,9 +65,6 @@ export async function uploadCvAction(_prevState: UploadCvState, formData: FormDa
   if (!(file instanceof File) || file.size === 0) {
     return { error: 'Selecione um arquivo PDF ou DOCX.', message: null }
   }
-  if (positioning.length === 0) {
-    return { error: 'Marque pelo menos um posicionamento (TPM, AI Product ou Web3).', message: null }
-  }
 
   const kind = detectFileKind(file)
   if (!kind) {
