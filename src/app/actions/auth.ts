@@ -1,0 +1,79 @@
+'use server'
+
+import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import { createClient } from '@/lib/supabase/auth-server'
+
+export interface AuthActionState {
+  error: string | null
+  message: string | null
+}
+
+async function getOrigin(): Promise<string> {
+  const headerList = await headers()
+  return headerList.get('origin') ?? 'http://localhost:3056'
+}
+
+export async function signInWithPasswordAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const email = String(formData.get('email') ?? '').trim()
+  const password = String(formData.get('password') ?? '')
+  const supabase = await createClient()
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) {
+    return { error: 'Email ou senha invalidos.', message: null }
+  }
+  redirect('/')
+}
+
+export async function signUpWithPasswordAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const email = String(formData.get('email') ?? '').trim()
+  const password = String(formData.get('password') ?? '')
+  const supabase = await createClient()
+  const origin = await getOrigin()
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${origin}/auth/callback` },
+  })
+  if (error) {
+    return { error: error.message, message: null }
+  }
+  return { error: null, message: 'Conta criada. Confira seu email pra confirmar antes de entrar.' }
+}
+
+export async function signInWithMagicLinkAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {
+  const email = String(formData.get('email') ?? '').trim()
+  const supabase = await createClient()
+  const origin = await getOrigin()
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: `${origin}/auth/callback` },
+  })
+  if (error) {
+    return { error: error.message, message: null }
+  }
+  return { error: null, message: 'Link enviado. Confira seu email.' }
+}
+
+export async function signInWithGoogleAction(_prevState: AuthActionState, _formData: FormData): Promise<AuthActionState> {
+  const supabase = await createClient()
+  const origin = await getOrigin()
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${origin}/auth/callback` },
+  })
+  if (error || !data.url) {
+    return { error: error?.message ?? 'Nao foi possivel iniciar login com Google.', message: null }
+  }
+  redirect(data.url)
+}
+
+export async function signOutAction(): Promise<void> {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
+}
