@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { listApplications } from '@/lib/repository'
-import { DEFAULT_USER_ID } from '@/lib/constants'
 
 export default async function DashboardPage({
   searchParams,
@@ -9,8 +9,9 @@ export default async function DashboardPage({
   searchParams: Promise<{ q?: string }>
 }) {
   const params = await searchParams
+  const userId = await getCurrentUserId()
   const db = createServiceClient()
-  const applications = await listApplications(db, DEFAULT_USER_ID, params.q)
+  const applications = await listApplications(db, userId, params.q)
 
   return (
     <main className="container">

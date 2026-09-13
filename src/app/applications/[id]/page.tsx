@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { getApplicationDetail } from '@/lib/repository'
 import { getCvDownloadUrl } from '@/lib/storage'
 import { updateStatusAction } from '@/app/actions/update-status'
@@ -16,8 +17,9 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
 
 export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const userId = await getCurrentUserId()
   const db = createServiceClient()
-  const { application, cvVersion, interviewQuestions } = await getApplicationDetail(db, id)
+  const { application, cvVersion, interviewQuestions } = await getApplicationDetail(db, id, userId)
   const downloadUrl = cvVersion ? await getCvDownloadUrl(db, cvVersion.storage_path) : null
 
   async function setStatus(formData: FormData) {

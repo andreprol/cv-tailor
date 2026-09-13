@@ -2,9 +2,9 @@
 
 import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { createApplication } from '@/lib/repository'
 import { fetchJobDescription } from '@/lib/extract-job-text'
-import { DEFAULT_USER_ID } from '@/lib/constants'
 
 export interface CreateApplicationState {
   error: string | null
@@ -35,8 +35,9 @@ export async function createApplicationAction(
     }
   }
 
+  const userId = await getCurrentUserId()
   const db = createServiceClient()
-  const application = await createApplication(db, DEFAULT_USER_ID, { company, roleTitle, sourceUrl: sourceUrl || null, jobDescriptionRaw })
+  const application = await createApplication(db, userId, { company, roleTitle, sourceUrl: sourceUrl || null, jobDescriptionRaw })
 
   redirect(`/applications/${application.id}`)
 }

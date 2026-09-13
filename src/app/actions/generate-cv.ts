@@ -3,12 +3,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import * as repo from '@/lib/repository'
 import { generateTailoredCv } from '@/lib/claude-generation'
 import { renderCvDocx } from '@/lib/docx-template'
 import { uploadCvDocx } from '@/lib/storage'
 import { runCvGeneration } from '@/lib/generate-cv-orchestrator'
-import { DEFAULT_USER_ID } from '@/lib/constants'
 
 export interface GenerateCvState {
   error: string | null
@@ -20,19 +20,20 @@ export async function generateCvAction(
   formData: FormData,
 ): Promise<GenerateCvState> {
   const editedJobDescription = String(formData.get('jobDescriptionRaw') ?? '').trim()
+  const userId = await getCurrentUserId()
   const db = createServiceClient()
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   try {
     if (editedJobDescription.length > 0) {
-      await repo.updateJobDescription(db, applicationId, editedJobDescription)
+      await repo.updateJobDescription(db, applicationId, userId, editedJobDescription)
     }
 
     await runCvGeneration(
       {
-        getApplication: (id) => repo.getApplication(db, id),
-        getMasterDataBank: () => repo.getMasterDataBank(db, DEFAULT_USER_ID),
-        getProfile: () => repo.getProfile(db, DEFAULT_USER_ID),
+        getApplication: (id) => repo.getApplication(db, id, userId),
+        getMasterDataBank: () => repo.getMasterDataBank(db, userId),
+        getProfile: () => repo.getProfile(db, userId),
         generateTailoredCv: (masterData, jobDescription) => generateTailoredCv(anthropic, masterData, jobDescription),
         renderCvDocx: (profile, content) => renderCvDocx(profile, content),
         uploadCvDocx: (id, buffer) => uploadCvDocx(db, id, buffer),
