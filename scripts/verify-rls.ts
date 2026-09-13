@@ -80,8 +80,15 @@ async function main() {
     // was already propagating.
     const results = await Promise.allSettled(cleanupIds.map((id) => admin.auth.admin.deleteUser(id)))
     results.forEach((result, i) => {
+      // supabase-js's deleteUser() resolves with { error } instead of
+      // rejecting for almost every realistic failure (wrong key, already
+      // deleted, rate limit, network error) — checking only `status ===
+      // 'rejected'` would silently miss those and leave the account live
+      // with no output. Check both shapes.
       if (result.status === 'rejected') {
         console.error(`Falha ao deletar usuario de teste ${cleanupIds[i]}:`, result.reason)
+      } else if (result.value.error) {
+        console.error(`Falha ao deletar usuario de teste ${cleanupIds[i]}:`, result.value.error)
       }
     })
   }
