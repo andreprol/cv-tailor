@@ -10,8 +10,6 @@ import { uploadCvAction, type UploadCvState } from '@/app/actions/upload-cv'
 // are plain async functions and can be called directly like this too).
 const EMPTY_ACTION_STATE: UploadCvState = { error: null, message: null }
 
-const POSITIONING_OPTIONS = ['TPM', 'AI Product', 'Web3'] as const
-
 // Keep in sync with next.config.mjs's serverActions.bodySizeLimit (4mb),
 // which itself is capped by Vercel's hard 4.5MB platform limit for
 // Serverless Functions. Checking here gives an immediate, friendly error
@@ -77,8 +75,6 @@ export function UploadCvForm() {
     event.preventDefault()
     if (isPending) return
 
-    const positioning = new FormData(event.currentTarget).getAll('positioning').map(String)
-
     if (files.length === 0) {
       setFormError('Selecione ao menos um CV (PDF ou DOCX).')
       return
@@ -96,7 +92,6 @@ export function UploadCvForm() {
         const file = batch[i]
         const formData = new FormData()
         formData.set('cvFile', file)
-        positioning.forEach((value) => formData.append('positioning', value))
 
         let outcome: UploadCvState
         try {
@@ -156,18 +151,6 @@ export function UploadCvForm() {
           disabled={isPending}
           onChange={handleFilesChange}
         />
-      </div>
-
-      <div className="field" style={{ marginTop: 'var(--space-4)' }}>
-        <span className="hint">Esses CVs são pra qual posicionamento? <span style={{ fontWeight: 400 }}>(opcional — marque se quiser, vale pra todos os arquivos selecionados)</span></span>
-        <div className="checkbox-row">
-          {POSITIONING_OPTIONS.map((option) => (
-            <label key={option}>
-              <input type="checkbox" name="positioning" value={option} disabled={isPending} />
-              {option}
-            </label>
-          ))}
-        </div>
       </div>
 
       {results.length > 0 && (
