@@ -2,11 +2,15 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { parseGeneratedCv, type GeneratedCv } from './generation-schema'
 import type { MasterDataBank } from './types'
 
+function formatTags(positioning: string[]): string {
+  return positioning.length ? `[${positioning.join('/')}] ` : ''
+}
+
 export function buildGenerationPrompt(masterData: MasterDataBank, jobDescription: string): string {
   const achievementLines = masterData.achievements
-    .map((a) => `- [${a.positioning.join('/')}] ${a.role_title} @ ${a.company}: ${a.bullet}`)
+    .map((a) => `- ${formatTags(a.positioning)}${a.role_title} @ ${a.company}: ${a.bullet}`)
     .join('\n')
-  const skillLines = masterData.skills.map((s) => `- [${s.positioning.join('/')}] ${s.name}`).join('\n')
+  const skillLines = masterData.skills.map((s) => `- ${formatTags(s.positioning)}${s.name}`).join('\n')
 
   return `Voce e um especialista em recrutamento tecnico e ATS. Gere um curriculo customizado pra vaga abaixo usando SOMENTE as conquistas e skills reais listadas no banco de dados. NUNCA invente conquista, metrica ou skill que nao esteja literalmente listada abaixo.
 
