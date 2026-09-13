@@ -35,7 +35,18 @@ export async function createApplicationAction(
     }
   }
 
-  const userId = await getCurrentUserId()
+  let userId: string
+  try {
+    userId = await getCurrentUserId()
+  } catch {
+    return {
+      error: 'Sua sessao expirou. Faca login novamente.',
+      company,
+      roleTitle,
+      sourceUrl,
+      jobDescriptionRaw: pastedText,
+    }
+  }
   const db = createServiceClient()
   const application = await createApplication(db, userId, { company, roleTitle, sourceUrl: sourceUrl || null, jobDescriptionRaw })
 

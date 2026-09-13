@@ -58,7 +58,7 @@ export async function getApplication(db: SupabaseClient, applicationId: string, 
 }
 
 export async function updateJobDescription(db: SupabaseClient, applicationId: string, userId: string, jobDescriptionRaw: string): Promise<void> {
-  const { error } = await db.from('applications').update({ job_description_raw: jobDescriptionRaw }).eq('id', applicationId).eq('user_id', userId)
+  const { error } = await db.from('applications').update({ job_description_raw: jobDescriptionRaw }).eq('id', applicationId).eq('user_id', userId).select().single()
   if (error) throw error
 }
 
@@ -88,7 +88,7 @@ export async function listApplications(db: SupabaseClient, userId: string, searc
 }
 
 export async function updateApplicationStatus(db: SupabaseClient, applicationId: string, userId: string, status: ApplicationStatus): Promise<void> {
-  const { error } = await db.from('applications').update({ status }).eq('id', applicationId).eq('user_id', userId)
+  const { error } = await db.from('applications').update({ status }).eq('id', applicationId).eq('user_id', userId).select().single()
   if (error) throw error
 }
 

@@ -20,7 +20,14 @@ export async function generateCvAction(
   formData: FormData,
 ): Promise<GenerateCvState> {
   const editedJobDescription = String(formData.get('jobDescriptionRaw') ?? '').trim()
-  const userId = await getCurrentUserId()
+
+  let userId: string
+  try {
+    userId = await getCurrentUserId()
+  } catch {
+    return { error: 'Sua sessao expirou. Faca login novamente.' }
+  }
+
   const db = createServiceClient()
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
