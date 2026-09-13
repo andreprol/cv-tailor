@@ -416,3 +416,47 @@ select { appearance: none; cursor: pointer; }
 .alert-info { background: var(--surface-2); color: var(--text); }
 
 .app-nav { display: flex; gap: var(--space-4); align-items: center; }
+
+/* ---------- perfil / upload ---------- */
+
+.upload-field {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.upload-field input[type="file"] { margin-top: var(--space-2); }
+
+.checkbox-row { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-2); }
+.checkbox-row label { display: flex; align-items: center; gap: 6px; font-weight: 400; color: var(--text); width: auto; }
+.checkbox-row input[type="checkbox"] { width: auto; }
+
+.profile-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.profile-item__title { font-weight: 600; }
+.profile-item__subtitle { color: var(--text-muted); font-size: 0.875rem; }
+.profile-item__tags { margin-top: var(--space-1); display: flex; gap: var(--space-1); }
+.profile-item__actions { display: flex; gap: var(--space-2); flex-shrink: 0; }
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+}
