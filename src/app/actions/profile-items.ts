@@ -70,7 +70,8 @@ export async function updateProfileItemAction(
   try {
     await updateProfileItem(db, validTable, id, userId, fields)
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Erro ao salvar.' }
+    console.error('updateProfileItemAction: falha ao salvar item do perfil:', error)
+    return { error: 'Erro ao salvar. Tente novamente.' }
   }
 
   revalidatePath('/perfil')
