@@ -1,5 +1,6 @@
 'use server'
 
+import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUserId } from '@/lib/supabase/auth-server'
@@ -28,11 +29,7 @@ export async function deleteProfileItemAction(table: string, id: string): Promis
   try {
     userId = await getCurrentUserId()
   } catch {
-    // Sessao expirou no meio da pagina /perfil. Este action e chamado por um
-    // <form action={...}> (botao de deletar), nao por uma navegacao inteira —
-    // redirecionar aqui seria abrupto. No-op: o middleware cuida da sessao
-    // na proxima navegacao.
-    return
+    redirect('/login')
   }
 
   const db = createServiceClient()

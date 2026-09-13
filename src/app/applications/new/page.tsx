@@ -6,10 +6,17 @@ import { createApplicationAction, type CreateApplicationState } from '@/app/acti
 
 const initialState: CreateApplicationState = { error: null, company: '', roleTitle: '', sourceUrl: '', jobDescriptionRaw: '' }
 
+// Keep in sync with next.config.mjs's serverActions.bodySizeLimit (4mb),
+// which itself is capped by Vercel's hard 4.5MB platform limit for
+// Serverless Functions. Checking here gives an immediate, friendly error
+// instead of a slow upload attempt that fails with an opaque 413.
+const MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024
+
 export default function NewApplicationPage() {
   const [state, formAction, pending] = useActionState(createApplicationAction, initialState)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [imageError, setImageError] = useState<string | null>(null)
 
   // Revoke on unmount too, not just on replacement — otherwise navigating
   // away from this page mid-preview leaks the blob URL for the tab's life.
@@ -20,6 +27,15 @@ export default function NewApplicationPage() {
   }, [previewUrl])
 
   function setImageFile(file: File | null) {
+    if (file && file.size > MAX_FILE_SIZE_BYTES) {
+      setImageError('Arquivo muito grande (máx 4MB). Tenta uma imagem menor ou comprimida.')
+      // The rejected file may already be sitting in the native file input
+      // (direct selection, as opposed to the paste path) — clear it so it
+      // never ends up in the form's FormData on submit.
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    setImageError(null)
     setPreviewUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev)
       return file ? URL.createObjectURL(file) : null
@@ -68,6 +84,7 @@ export default function NewApplicationPage() {
 
         <div className="field">
           <label htmlFor="jobImage">Ou cole/suba um print da vaga <span className="hint">(imagem — opcional)</span></label>
+          {imageError && <div className="alert alert-error" role="alert">{imageError}</div>}
           <div className="upload-field" onPaste={handlePaste} tabIndex={0}>
             {previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

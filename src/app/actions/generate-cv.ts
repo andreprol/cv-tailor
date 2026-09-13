@@ -8,7 +8,7 @@ import * as repo from '@/lib/repository'
 import { generateTailoredCv } from '@/lib/claude-generation'
 import { renderCvDocx } from '@/lib/docx-template'
 import { uploadCvDocx } from '@/lib/storage'
-import { runCvGeneration } from '@/lib/generate-cv-orchestrator'
+import { runCvGeneration, CvGenerationError } from '@/lib/generate-cv-orchestrator'
 
 export interface GenerateCvState {
   error: string | null
@@ -50,7 +50,17 @@ export async function generateCvAction(
       applicationId,
     )
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Erro desconhecido ao gerar o CV.' }
+    console.error('generateCvAction: falha ao gerar CV:', error)
+    // CvGenerationError is runCvGeneration's own deliberate, safe,
+    // user-facing message (banco mestre vazio / nenhuma conquista relevante /
+    // matchWarning do modelo) — show it as-is. Anything else here is a raw
+    // infra error (Postgrest/Supabase from repo.updateJobDescription above,
+    // or from the deps inside runCvGeneration — storage upload, docx
+    // rendering, Anthropic) that must not reach the client verbatim.
+    if (error instanceof CvGenerationError) {
+      return { error: error.message }
+    }
+    return { error: 'Erro ao gerar o CV. Tente novamente em instantes.' }
   }
 
   revalidatePath(`/applications/${applicationId}`)
