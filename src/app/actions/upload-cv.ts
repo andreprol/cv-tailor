@@ -53,7 +53,7 @@ async function persistExtractedData(
   userId: string,
   positioning: Positioning[],
   extracted: ImportedCv,
-): Promise<{ saved: string[]; error: string | null }> {
+): Promise<{ saved: string[]; skippedCount: number; error: string | null }> {
   const saved: string[] = []
   try {
     // Fetch the current master data bank fresh on every call. When multiple
@@ -103,14 +103,11 @@ async function persistExtractedData(
       await insertCertifications(db, userId, positioning, newCertifications)
       saved.push(`${newCertifications.length} certificacoes`)
     }
-    if (totalSkipped > 0) {
-      saved.push(`${totalSkipped} ja existiam (nao duplicados)`)
-    }
-    return { saved, error: null }
+    return { saved, skippedCount: totalSkipped, error: null }
   } catch (error) {
     console.error('uploadCvAction: falha ao salvar dados extraidos:', error)
     const savedSoFar = saved.length > 0 ? `Ja foi salvo antes do erro: ${saved.join(', ')}.` : 'Nada foi salvo.'
-    return { saved, error: `Erro ao salvar parte dos dados extraidos. ${savedSoFar} Pode tentar subir o mesmo CV de novo — os itens ja salvos nao serao duplicados.` }
+    return { saved, skippedCount: 0, error: `Erro ao salvar parte dos dados extraidos. ${savedSoFar} Pode tentar subir o mesmo CV de novo — os itens ja salvos nao serao duplicados.` }
   }
 }
 
@@ -147,7 +144,7 @@ export async function uploadCvAction(_prevState: UploadCvState, formData: FormDa
   }
 
   const db = createServiceClient()
-  const { saved, error } = await persistExtractedData(db, userId, positioning, extracted)
+  const { saved, skippedCount, error } = await persistExtractedData(db, userId, positioning, extracted)
 
   revalidatePath('/perfil')
 
@@ -155,8 +152,14 @@ export async function uploadCvAction(_prevState: UploadCvState, formData: FormDa
     return { error, message: null }
   }
 
+  const skippedNote = skippedCount > 0 ? ` (${skippedCount} ja existia${skippedCount === 1 ? '' : 'm'}, nao duplicado${skippedCount === 1 ? '' : 's'})` : ''
+
   return {
     error: null,
-    message: saved.length > 0 ? `Importado: ${saved.join(', ')}.` : 'Nenhum dado novo encontrado nesse CV.',
+    message: saved.length > 0
+      ? `Importado: ${saved.join(', ')}.${skippedNote}`
+      : skippedCount > 0
+        ? `Nenhum dado novo — tudo o que esse CV tem ja estava no seu banco (${skippedCount} item${skippedCount === 1 ? '' : 's'}).`
+        : 'Nenhum dado novo encontrado nesse CV.',
   }
 }
