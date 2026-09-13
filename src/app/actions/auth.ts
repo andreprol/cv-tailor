@@ -10,6 +10,9 @@ export interface AuthActionState {
 }
 
 async function getOrigin(): Promise<string> {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
   const headerList = await headers()
   return headerList.get('origin') ?? 'http://localhost:3056'
 }
@@ -77,6 +80,9 @@ export async function signInWithGoogleAction(_prevState: AuthActionState, _formD
 
 export async function signOutAction(): Promise<void> {
   const supabase = await createClient()
-  await supabase.auth.signOut()
+  const { error } = await supabase.auth.signOut()
+  if (error) {
+    console.error('signOutAction: falha ao encerrar sessao Supabase:', error)
+  }
   redirect('/login')
 }
