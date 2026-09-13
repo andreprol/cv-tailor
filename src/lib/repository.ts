@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Application, ApplicationStatus, CvVersion, InterviewQuestion, MasterDataBank, Profile } from './types'
+import type { Application, ApplicationStatus, CvVersion, InterviewQuestion, MasterDataBank, Positioning, Profile } from './types'
 
 export async function getMasterDataBank(db: SupabaseClient, userId: string): Promise<MasterDataBank> {
   const [
@@ -110,4 +110,65 @@ export async function getApplicationDetail(
   if (cvError) throw cvError
   if (iqError) throw iqError
   return { application, cvVersion: cvVersion ?? null, interviewQuestions: interviewQuestions ?? [] }
+}
+
+export async function insertAchievements(
+  db: SupabaseClient,
+  userId: string,
+  positioning: Positioning[],
+  items: { company: string; roleTitle: string; startDate: string; endDate: string | null; bullet: string; metric: string | null }[],
+): Promise<void> {
+  const rows = items.map((a) => ({
+    user_id: userId, company: a.company, role_title: a.roleTitle,
+    start_date: a.startDate, end_date: a.endDate, bullet: a.bullet, metric: a.metric, positioning,
+  }))
+  const { error } = await db.from('achievements').insert(rows)
+  if (error) throw error
+}
+
+export async function insertSkills(
+  db: SupabaseClient,
+  userId: string,
+  positioning: Positioning[],
+  items: { name: string; category: string }[],
+): Promise<void> {
+  const rows = items.map((s) => ({ user_id: userId, name: s.name, category: s.category, positioning }))
+  const { error } = await db.from('skills').insert(rows)
+  if (error) throw error
+}
+
+export async function insertEducation(
+  db: SupabaseClient,
+  userId: string,
+  positioning: Positioning[],
+  items: { institution: string; degree: string; completedOn: string | null; inProgress: boolean }[],
+): Promise<void> {
+  const rows = items.map((e) => ({
+    user_id: userId, institution: e.institution, degree: e.degree, completed_on: e.completedOn, in_progress: e.inProgress, positioning,
+  }))
+  const { error } = await db.from('education').insert(rows)
+  if (error) throw error
+}
+
+export async function insertCertifications(
+  db: SupabaseClient,
+  userId: string,
+  positioning: Positioning[],
+  items: { name: string; issuer: string | null; issuedOn: string | null }[],
+): Promise<void> {
+  const rows = items.map((c) => ({ user_id: userId, name: c.name, issuer: c.issuer, issued_on: c.issuedOn, positioning }))
+  const { error } = await db.from('certifications').insert(rows)
+  if (error) throw error
+}
+
+export type ProfileItemTable = 'achievements' | 'education' | 'skills' | 'certifications'
+
+export async function deleteProfileItem(db: SupabaseClient, table: ProfileItemTable, id: string, userId: string): Promise<void> {
+  const { error } = await db.from(table).delete().eq('id', id).eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function updateProfileItem(db: SupabaseClient, table: ProfileItemTable, id: string, userId: string, fields: Record<string, string>): Promise<void> {
+  const { error } = await db.from(table).update(fields).eq('id', id).eq('user_id', userId)
+  if (error) throw error
 }
