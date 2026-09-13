@@ -15,7 +15,15 @@ async function isLoggedIn(): Promise<boolean> {
   try {
     await getCurrentUserId()
     return true
-  } catch {
+  } catch (error) {
+    // getCurrentUserId() throws 'Usuario nao autenticado...' as its designed
+    // signal for "no session" — that's the expected, high-frequency case for
+    // every logged-out visit and would flood logs if reported as a warning.
+    // Anything else (env vars missing, Supabase unreachable) is a real
+    // infra failure worth surfacing.
+    if (!(error instanceof Error) || !error.message.startsWith('Usuario nao autenticado')) {
+      console.error('RootLayout: falha inesperada ao verificar sessao:', error)
+    }
     return false
   }
 }
