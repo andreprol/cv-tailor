@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import mammoth from 'mammoth'
 import { parseImportedCv, type ImportedCv } from './import-schema'
 
