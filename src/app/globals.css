@@ -181,7 +181,7 @@ a:hover { text-decoration: underline; }
   color: var(--text-muted);
 }
 
-.field .hint {
+.hint {
   font-size: 0.8125rem;
   color: var(--text-muted);
   font-weight: 400;
