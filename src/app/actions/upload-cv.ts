@@ -110,7 +110,7 @@ async function persistExtractedData(
   } catch (error) {
     console.error('uploadCvAction: falha ao salvar dados extraidos:', error)
     const savedSoFar = saved.length > 0 ? `Ja foi salvo antes do erro: ${saved.join(', ')}.` : 'Nada foi salvo.'
-    return { saved, error: `Erro ao salvar parte dos dados extraidos. ${savedSoFar} Tenta subir o mesmo CV de novo — os itens ja salvos nao duplicam automaticamente, entao confira o perfil antes de reenviar.` }
+    return { saved, error: `Erro ao salvar parte dos dados extraidos. ${savedSoFar} Pode tentar subir o mesmo CV de novo — os itens ja salvos nao serao duplicados.` }
   }
 }
 
