@@ -159,7 +159,7 @@ export async function uploadCvAction(_prevState: UploadCvState, formData: FormDa
     message: saved.length > 0
       ? `Importado: ${saved.join(', ')}.${skippedNote}`
       : skippedCount > 0
-        ? `Nenhum dado novo — tudo o que esse CV tem ja estava no seu banco (${skippedCount} item${skippedCount === 1 ? '' : 's'}).`
+        ? `Nenhum dado novo — tudo o que esse CV tem ja estava no seu banco (${skippedCount} ${skippedCount === 1 ? 'item' : 'itens'}).`
         : 'Nenhum dado novo encontrado nesse CV.',
   }
 }
