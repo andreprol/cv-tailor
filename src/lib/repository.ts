@@ -168,7 +168,10 @@ export async function deleteProfileItem(db: SupabaseClient, table: ProfileItemTa
   if (error) throw error
 }
 
+// SECURITY: `fields` is applied to the row as-is with no column allowlist —
+// the caller must only ever build it from a known-safe set of editable
+// columns (see the EDITABLE_FIELDS allowlist in src/app/actions/profile-items.ts).
 export async function updateProfileItem(db: SupabaseClient, table: ProfileItemTable, id: string, userId: string, fields: Record<string, string>): Promise<void> {
-  const { error } = await db.from(table).update(fields).eq('id', id).eq('user_id', userId)
+  const { error } = await db.from(table).update(fields).eq('id', id).eq('user_id', userId).select().single()
   if (error) throw error
 }
