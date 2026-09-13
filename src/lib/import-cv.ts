@@ -11,6 +11,13 @@ export type CvFileKind = 'pdf' | 'docx'
 async function callOncePdf(anthropic: Anthropic, buffer: Buffer): Promise<ImportedCv> {
   const response = await anthropic.beta.messages.create({
     model: 'claude-sonnet-5',
+    // claude-sonnet-5 uses extended thinking by default, which consumes part
+    // of max_tokens before the model starts writing its answer. A lower
+    // value here previously caused silent truncation elsewhere in this
+    // codebase (a thinking-only response with no text block ever produced —
+    // see the identical comment in claude-generation.ts and the old
+    // scripts/import-cv.ts). 16000 leaves real headroom above what a
+    // CV-sized extraction actually uses.
     max_tokens: 16000,
     betas: ['pdfs-2024-09-25'],
     messages: [{
@@ -28,10 +35,10 @@ async function callOncePdf(anthropic: Anthropic, buffer: Buffer): Promise<Import
   return parseImportedCv(textBlock.text)
 }
 
-async function callOnceDocx(anthropic: Anthropic, buffer: Buffer): Promise<ImportedCv> {
-  const { value: text } = await mammoth.extractRawText({ buffer })
+async function callOnceDocx(anthropic: Anthropic, text: string): Promise<ImportedCv> {
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-5',
+    // Same rationale as callOncePdf above — extended thinking needs headroom.
     max_tokens: 16000,
     messages: [{ role: 'user', content: `${EXTRACTION_PROMPT}\n\nTEXTO DO CURRICULO:\n${text}` }],
   })
@@ -43,10 +50,23 @@ async function callOnceDocx(anthropic: Anthropic, buffer: Buffer): Promise<Impor
 }
 
 export async function extractCvData(anthropic: Anthropic, kind: CvFileKind, buffer: Buffer): Promise<ImportedCv> {
-  const callOnce = kind === 'pdf' ? callOncePdf : callOnceDocx
+  if (kind === 'pdf') {
+    try {
+      return await callOncePdf(anthropic, buffer)
+    } catch {
+      return await callOncePdf(anthropic, buffer)
+    }
+  }
+
+  // Mammoth parsing is deterministic local work, not a transient failure —
+  // a corrupt/unparseable buffer fails identically every time. Extract once,
+  // outside the retry loop, so the retry only covers the actual Claude call
+  // (and a genuinely broken upload fails fast with its real error, instead
+  // of being masked by a blind retry-then-give-up).
+  const { value: text } = await mammoth.extractRawText({ buffer })
   try {
-    return await callOnce(anthropic, buffer)
+    return await callOnceDocx(anthropic, text)
   } catch {
-    return await callOnce(anthropic, buffer)
+    return await callOnceDocx(anthropic, text)
   }
 }
