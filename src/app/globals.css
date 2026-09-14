@@ -384,6 +384,7 @@ select { appearance: none; cursor: pointer; }
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .job-title {
