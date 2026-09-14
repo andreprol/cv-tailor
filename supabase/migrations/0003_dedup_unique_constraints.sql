@@ -18,6 +18,13 @@ create or replace function normalize_text(value text) returns text
     select lower(trim(regexp_replace(value, '\s+', ' ', 'g')))
   $$;
 
+-- Mesmo motivo: o cast date::text depende de configuracao de sessao
+-- (DateStyle), entao Postgres tambem marca esse cast como nao-imutavel.
+create or replace function normalize_date(value date) returns text
+  language sql immutable as $$
+    select coalesce(value::text, '')
+  $$;
+
 delete from achievements a using achievements b
 where a.user_id = b.user_id
   and normalize_text(a.company) = normalize_text(b.company)
@@ -40,7 +47,7 @@ delete from certifications a using certifications b
 where a.user_id = b.user_id
   and normalize_text(a.name) = normalize_text(b.name)
   and normalize_text(coalesce(a.issuer, '')) = normalize_text(coalesce(b.issuer, ''))
-  and coalesce(a.issued_on::text, '') = coalesce(b.issued_on::text, '')
+  and normalize_date(a.issued_on) = normalize_date(b.issued_on)
   and (a.created_at, a.id) > (b.created_at, b.id);
 
 -- Colunas geradas normalizadas + indice unico por tabela.
@@ -68,7 +75,7 @@ create unique index education_dedup_idx on education (user_id, institution_norm,
 alter table certifications
   add column name_norm text generated always as (normalize_text(name)) stored,
   add column issuer_norm text generated always as (normalize_text(coalesce(issuer, ''))) stored,
-  add column issued_on_norm text generated always as (coalesce(issued_on::text, '')) stored;
+  add column issued_on_norm text generated always as (normalize_date(issued_on)) stored;
 
 create unique index certifications_dedup_idx on certifications (user_id, name_norm, issuer_norm, issued_on_norm);
 
