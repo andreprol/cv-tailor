@@ -3,10 +3,25 @@
 import { useState } from 'react'
 import { deleteApplicationAction } from '@/app/actions/delete-application'
 
+function isNextRedirectError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as { digest?: unknown }).digest === 'string' &&
+    (error as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  )
+}
+
 export function DeleteApplicationButton({ applicationId }: { applicationId: string }) {
   const [confirming, setConfirming] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  function cancel() {
+    setConfirming(false)
+    setError(null)
+  }
 
   if (confirming) {
     return (
@@ -19,7 +34,8 @@ export function DeleteApplicationButton({ applicationId }: { applicationId: stri
               setError(null)
               try {
                 await deleteApplicationAction(applicationId)
-              } catch {
+              } catch (e) {
+                if (isNextRedirectError(e)) throw e
                 setPending(false)
                 setError('Erro ao apagar. Tente novamente.')
               }
@@ -29,7 +45,7 @@ export function DeleteApplicationButton({ applicationId }: { applicationId: stri
               {pending ? 'Apagando…' : 'Confirmar'}
             </button>
           </form>
-          <button type="button" onClick={() => setConfirming(false)} disabled={pending} className="btn btn-secondary">
+          <button type="button" onClick={cancel} disabled={pending} className="btn btn-secondary">
             Cancelar
           </button>
         </div>
