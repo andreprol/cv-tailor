@@ -417,6 +417,14 @@ select { appearance: none; cursor: pointer; }
 
 .app-nav { display: flex; gap: var(--space-4); align-items: center; }
 
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
 /* ---------- perfil / upload ---------- */
 
 .upload-field {

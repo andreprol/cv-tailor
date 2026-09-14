@@ -14,7 +14,16 @@ export async function getOrigin(): Promise<string> {
     return process.env.NEXT_PUBLIC_SITE_URL
   }
   const headerList = await headers()
-  return headerList.get('origin') ?? 'http://localhost:3056'
+  const origin = headerList.get('origin')
+  if (origin) {
+    return origin
+  }
+  // Server Actions don't reliably send an `origin` header (e.g. a <form>
+  // submitted without JS), and a stray dev machine's localhost here would
+  // silently redirect real users' OAuth/magic-link logins to that machine.
+  // NEXT_PUBLIC_SITE_URL must be set in any deployed environment; only a
+  // bare local dev run (no env, no header) falls through to this default.
+  return 'http://localhost:3000'
 }
 
 export async function signInWithPasswordAction(_prevState: AuthActionState, formData: FormData): Promise<AuthActionState> {

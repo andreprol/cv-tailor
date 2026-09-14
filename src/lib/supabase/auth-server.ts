@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 
 export async function createClient(): Promise<SupabaseClient> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -27,11 +27,16 @@ export async function createClient(): Promise<SupabaseClient> {
   })
 }
 
-export async function getCurrentUserId(): Promise<string> {
+export async function getCurrentUser(): Promise<User> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     throw new Error('Usuario nao autenticado. Faca login para continuar.')
   }
+  return user
+}
+
+export async function getCurrentUserId(): Promise<string> {
+  const user = await getCurrentUser()
   return user.id
 }
