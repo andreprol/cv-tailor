@@ -58,7 +58,10 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
           <h2>CV gerado</h2>
           <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <span>Currículo pronto, ATS-safe, sob medida pra essa vaga.</span>
-            <a href={downloadUrl} className="btn btn-primary">⬇ Baixar .docx</a>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <a href={downloadUrl} className="btn btn-primary">⬇ Baixar .docx</a>
+              <a href={`/applications/${application.id}/pdf`} className="btn btn-secondary">⬇ Baixar PDF</a>
+            </div>
           </div>
 
           <h2>Perguntas prováveis de entrevista</h2>
