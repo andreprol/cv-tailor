@@ -93,6 +93,15 @@ export async function updateApplicationStatus(db: SupabaseClient, applicationId:
 }
 
 export async function deleteApplication(db: SupabaseClient, applicationId: string, userId: string): Promise<void> {
+  const { data: application, error: appError } = await db
+    .from('applications')
+    .select('id')
+    .eq('id', applicationId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (appError) throw appError
+  if (!application) return
+
   const { data: versions, error: versionsError } = await db
     .from('cv_versions')
     .select('storage_path')
