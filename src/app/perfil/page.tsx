@@ -60,9 +60,14 @@ export default async function PerfilPage() {
     <main className="container">
       <div className="section-header">
         <h1>Perfil</h1>
-        <Link href="/applications/new" className="btn btn-primary">
-          + Nova candidatura
-        </Link>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link href="/" className="btn btn-primary">
+            Ver candidaturas
+          </Link>
+          <Link href="/applications/new" className="btn btn-primary">
+            + Nova candidatura
+          </Link>
+        </div>
       </div>
       <p className="hint">Suba um CV (PDF ou DOCX) pra alimentar seu banco de dados. Edite ou apague qualquer item quando quiser — a revisão nunca é obrigatória.</p>
 
