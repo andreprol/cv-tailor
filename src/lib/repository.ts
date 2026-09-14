@@ -142,13 +142,14 @@ export async function insertAchievements(
   userId: string,
   positioning: Positioning[],
   items: { company: string; roleTitle: string; startDate: string; endDate: string | null; bullet: string; metric: string | null }[],
-): Promise<void> {
+): Promise<number> {
   const rows = items.map((a) => ({
     user_id: userId, company: a.company, role_title: a.roleTitle,
     start_date: a.startDate, end_date: a.endDate, bullet: a.bullet, metric: a.metric, positioning,
   }))
-  const { error } = await db.from('achievements').insert(rows)
+  const { data, error } = await db.from('achievements').upsert(rows, { onConflict: 'user_id,company_norm,role_title_norm,bullet_norm', ignoreDuplicates: true }).select()
   if (error) throw error
+  return data?.length ?? 0
 }
 
 export async function insertSkills(
@@ -156,10 +157,11 @@ export async function insertSkills(
   userId: string,
   positioning: Positioning[],
   items: { name: string; category: string }[],
-): Promise<void> {
+): Promise<number> {
   const rows = items.map((s) => ({ user_id: userId, name: s.name, category: s.category, positioning }))
-  const { error } = await db.from('skills').insert(rows)
+  const { data, error } = await db.from('skills').upsert(rows, { onConflict: 'user_id,name_norm', ignoreDuplicates: true }).select()
   if (error) throw error
+  return data?.length ?? 0
 }
 
 export async function insertEducation(
@@ -167,12 +169,13 @@ export async function insertEducation(
   userId: string,
   positioning: Positioning[],
   items: { institution: string; degree: string; completedOn: string | null; inProgress: boolean }[],
-): Promise<void> {
+): Promise<number> {
   const rows = items.map((e) => ({
     user_id: userId, institution: e.institution, degree: e.degree, completed_on: e.completedOn, in_progress: e.inProgress, positioning,
   }))
-  const { error } = await db.from('education').insert(rows)
+  const { data, error } = await db.from('education').upsert(rows, { onConflict: 'user_id,institution_norm,degree_norm', ignoreDuplicates: true }).select()
   if (error) throw error
+  return data?.length ?? 0
 }
 
 export async function insertCertifications(
@@ -180,10 +183,11 @@ export async function insertCertifications(
   userId: string,
   positioning: Positioning[],
   items: { name: string; issuer: string | null; issuedOn: string | null }[],
-): Promise<void> {
+): Promise<number> {
   const rows = items.map((c) => ({ user_id: userId, name: c.name, issuer: c.issuer, issued_on: c.issuedOn, positioning }))
-  const { error } = await db.from('certifications').insert(rows)
+  const { data, error } = await db.from('certifications').upsert(rows, { onConflict: 'user_id,name_norm,issuer_norm,issued_on_norm', ignoreDuplicates: true }).select()
   if (error) throw error
+  return data?.length ?? 0
 }
 
 export type ProfileItemTable = 'achievements' | 'education' | 'skills' | 'certifications'
