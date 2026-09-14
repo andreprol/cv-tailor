@@ -61,14 +61,50 @@ Responda APENAS com um JSON no formato exato:
 {"sufficientMatch": true, "matchWarning": null, "headline": "...", "summary": "...", "selectedAchievements": [{"achievementId": "...", "bullet": "..."}], "keywords": ["..."], "interviewQuestions": [{"question": "...", "rationale": "..."}]}`
 }
 
+function extractDigits(text: string): string[] {
+  return text.match(/\d+/g) ?? []
+}
+
+// A plain substring check would let "5%" pass against a bullet containing
+// "50%" (since "5" is literally a substring of "50") — exactly the kind of
+// altered number this guard exists to catch. Require the number to appear as
+// a whole token (not embedded inside a longer digit run) instead.
+function containsWholeNumber(text: string, number: string): boolean {
+  return new RegExp(`(?<!\\d)${number}(?!\\d)`).test(text)
+}
+
 export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvResponse): GeneratedCv {
-  const selectedAchievements = model.selectedAchievements.map((selected) => {
+  const seenIds = new Set<string>()
+  const selectedAchievements = []
+
+  for (const selected of model.selectedAchievements) {
+    // A model quirk (not a fabrication signal) can select the same real
+    // achievement twice — drop the repeat instead of rendering the same
+    // bullet twice in the final document.
+    if (seenIds.has(selected.achievementId)) continue
+    seenIds.add(selected.achievementId)
+
     const real = masterData.achievements.find((a) => a.id === selected.achievementId)
     if (!real) {
       throw new Error(`Conquista nao encontrada no banco mestre (possivel alucinacao): id "${selected.achievementId}" nao existe.`)
     }
-    return { company: real.company, roleTitle: real.role_title, bullet: selected.bullet }
-  })
+
+    // Provenance-by-id proves the achievement is real, but the translated
+    // bullet's WORDING is still fully trusted to the model — nothing else
+    // checks that a number/percentage survived translation unchanged. Since
+    // `metric` already stores the achievement's key number separately,
+    // cross-check its digits actually appear in the translated bullet
+    // (tolerant of reformatting like "30%" -> "30 percent", but catches an
+    // altered number like "50%").
+    if (real.metric) {
+      const missingDigits = extractDigits(real.metric).filter((digit) => !containsWholeNumber(selected.bullet, digit))
+      if (missingDigits.length > 0) {
+        throw new Error(`Numero/metrica alterado na traducao (possivel alucinacao): conquista "${real.bullet}" tem metrica real "${real.metric}", mas o bullet gerado nao contem ${missingDigits.join(', ')}.`)
+      }
+    }
+
+    selectedAchievements.push({ company: real.company, roleTitle: real.role_title, bullet: selected.bullet })
+  }
 
   return {
     sufficientMatch: model.sufficientMatch,

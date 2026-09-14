@@ -72,6 +72,39 @@ describe('assembleGeneratedCv', () => {
     expect(result!.selectedAchievements[0].roleTitle).toBe('IT Manager')
     expect(result!.selectedAchievements[0].bullet).toBe('Reduzimos o custo de mercadorias vendidas em 5%.')
   })
+
+  it('throws when a translated bullet drops or alters the real achievement\'s metric', () => {
+    const model = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      // Real metric is "5%" — this bullet says 50%, a hallucinated number.
+      selectedAchievements: [{ achievementId: '1', bullet: 'Reduced costs by 50%.' }],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+    expect(() => assembleGeneratedCv(masterData, model)).toThrow(/alucina/)
+  })
+
+  it('deduplicates a repeated achievementId instead of rendering the same achievement twice', () => {
+    const model = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      selectedAchievements: [
+        { achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' },
+        { achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' },
+      ],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+
+    const result = assembleGeneratedCv(masterData, model)
+
+    expect(result.selectedAchievements).toHaveLength(1)
+  })
 })
 
 describe('generateTailoredCv', () => {
