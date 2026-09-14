@@ -92,6 +92,22 @@ export async function updateApplicationStatus(db: SupabaseClient, applicationId:
   if (error) throw error
 }
 
+export async function deleteApplication(db: SupabaseClient, applicationId: string, userId: string): Promise<void> {
+  const { data: versions, error: versionsError } = await db
+    .from('cv_versions')
+    .select('storage_path')
+    .eq('application_id', applicationId)
+  if (versionsError) throw versionsError
+
+  if (versions && versions.length > 0) {
+    const { error: storageError } = await db.storage.from('cv-files').remove(versions.map((v) => v.storage_path))
+    if (storageError) console.error('deleteApplication: falha ao remover arquivos do Storage:', storageError)
+  }
+
+  const { error } = await db.from('applications').delete().eq('id', applicationId).eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function getApplicationDetail(
   db: SupabaseClient,
   applicationId: string,
