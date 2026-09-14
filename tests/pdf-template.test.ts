@@ -41,6 +41,19 @@ describe('renderCvPdf', () => {
     const buffer = await renderCvPdf(profile, emptyContent)
     expect(buffer.length).toBeGreaterThan(0)
   })
+
+  it('paginates automatically without throwing when content overflows one page', async () => {
+    const longAchievements = Array.from({ length: 20 }, (_, i) => ({
+      company: `Company ${i}`,
+      roleTitle: `Role ${i}`,
+      bullet: 'A fairly long bullet point describing significant impact and measurable results achieved over an extended period of dedicated work.',
+    }))
+    const longContent: GeneratedCv = { ...content, selectedAchievements: longAchievements }
+    const buffer = await renderCvPdf(profile, longContent)
+    expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-')
+    const { numpages } = await pdfParse(buffer)
+    expect(numpages).toBeGreaterThan(1)
+  })
 })
 
 describe('sanitizeFilename', () => {
@@ -50,5 +63,9 @@ describe('sanitizeFilename', () => {
 
   it('falls back to a default name when the result would be empty', () => {
     expect(sanitizeFilename('???')).toBe('curriculo')
+  })
+
+  it('transliterates accented characters to their base ASCII letter', () => {
+    expect(sanitizeFilename('André Global')).toBe('Andre Global')
   })
 })

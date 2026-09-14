@@ -3,7 +3,8 @@ import type { Profile } from './types'
 import type { GeneratedCv } from './generation-schema'
 
 export function sanitizeFilename(name: string): string {
-  const cleaned = name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim()
+  const transliterated = name.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const cleaned = transliterated.replace(/[^a-zA-Z0-9-_ ]/g, '').trim()
   return cleaned.length > 0 ? cleaned : 'curriculo'
 }
 
