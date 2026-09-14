@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import * as repo from '@/lib/repository'
-import { generateTailoredCv } from '@/lib/claude-generation'
+import { generateTailoredCv, type CvLanguage } from '@/lib/claude-generation'
 import { renderCvDocx } from '@/lib/docx-template'
 import { uploadCvDocx } from '@/lib/storage'
 import { runCvGeneration, CvGenerationError } from '@/lib/generate-cv-orchestrator'
@@ -20,6 +20,8 @@ export async function generateCvAction(
   formData: FormData,
 ): Promise<GenerateCvState> {
   const editedJobDescription = String(formData.get('jobDescriptionRaw') ?? '').trim()
+  const languageRaw = String(formData.get('language') ?? 'pt')
+  const language: CvLanguage = languageRaw === 'en' ? 'en' : 'pt'
 
   let userId: string
   try {
@@ -41,13 +43,14 @@ export async function generateCvAction(
         getApplication: (id) => repo.getApplication(db, id, userId),
         getMasterDataBank: () => repo.getMasterDataBank(db, userId),
         getProfile: () => repo.getProfile(db, userId),
-        generateTailoredCv: (masterData, jobDescription) => generateTailoredCv(anthropic, masterData, jobDescription),
+        generateTailoredCv: (masterData, jobDescription, lang) => generateTailoredCv(anthropic, masterData, jobDescription, lang),
         renderCvDocx: (profile, content) => renderCvDocx(profile, content),
         uploadCvDocx: (id, buffer) => uploadCvDocx(db, id, buffer),
         saveCvVersion: (id, storagePath, generatedJson) => repo.saveCvVersion(db, id, storagePath, generatedJson),
         saveInterviewQuestions: (id, questions) => repo.saveInterviewQuestions(db, id, questions),
       },
       applicationId,
+      language,
     )
   } catch (error) {
     console.error('generateCvAction: falha ao gerar CV:', error)

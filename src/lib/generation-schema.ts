@@ -1,14 +1,40 @@
 import { z } from 'zod'
 import { stripMarkdownFence } from './strip-markdown-fence'
 
+// This is what Claude actually returns. It must cite the REAL achievement it
+// used by id (never invent one) — the id is what proves the underlying fact
+// is real. It may translate/rephrase the bullet text into the requested
+// language, which is why bullet text can no longer be the provenance check
+// (a faithful translation will never match the original verbatim).
+export const modelCvResponseSchema = z.object({
+  sufficientMatch: z.boolean(),
+  matchWarning: z.string().nullable(),
+  headline: z.string().min(1),
+  summary: z.string().min(1),
+  selectedAchievements: z.array(z.object({
+    achievementId: z.string().min(1),
+    bullet: z.string().min(1),
+  })),
+  keywords: z.array(z.string().min(1)),
+  interviewQuestions: z.array(z.object({
+    question: z.string().min(1),
+    rationale: z.string().min(1),
+  })),
+})
+
+export type ModelCvResponse = z.infer<typeof modelCvResponseSchema>
+
+export function parseModelCvResponse(raw: string): ModelCvResponse {
+  const json = JSON.parse(stripMarkdownFence(raw))
+  return modelCvResponseSchema.parse(json)
+}
+
+// The final, fully-assembled shape everything downstream (docx-template,
+// orchestrator, storage) consumes. company/roleTitle here are ALWAYS sourced
+// from the real master data record (see assembleGeneratedCv in
+// claude-generation.ts) — never trusted from the model's own JSON — so a
+// mismatched or hallucinated company name can never reach a rendered CV.
 export const generatedCvSchema = z.object({
-  // Explicit, structured signal for "this vaga doesn't genuinely match the
-  // master data bank" — added after real testing showed the model, lacking
-  // this field, would instead write its honest "this isn't a good fit"
-  // assessment straight into the `summary` field of the actual résumé
-  // document. The orchestrator checks this before ever rendering/uploading
-  // a file, so the warning reaches the user as an error, not as embarrassing
-  // text in a document that might get sent to a real recruiter.
   sufficientMatch: z.boolean(),
   matchWarning: z.string().nullable(),
   headline: z.string().min(1),
@@ -26,8 +52,3 @@ export const generatedCvSchema = z.object({
 })
 
 export type GeneratedCv = z.infer<typeof generatedCvSchema>
-
-export function parseGeneratedCv(raw: string): GeneratedCv {
-  const json = JSON.parse(stripMarkdownFence(raw))
-  return generatedCvSchema.parse(json)
-}

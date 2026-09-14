@@ -1,4 +1,5 @@
 import type { GeneratedCv } from './generation-schema'
+import type { CvLanguage } from './claude-generation'
 import type { Application, MasterDataBank, Profile } from './types'
 
 // Marks an error as one of runCvGeneration's own deliberate, user-facing
@@ -19,14 +20,14 @@ export interface GenerateCvDeps {
   getApplication: (applicationId: string) => Promise<Application>
   getMasterDataBank: () => Promise<MasterDataBank>
   getProfile: () => Promise<Profile>
-  generateTailoredCv: (masterData: MasterDataBank, jobDescription: string) => Promise<GeneratedCv>
+  generateTailoredCv: (masterData: MasterDataBank, jobDescription: string, language: CvLanguage) => Promise<GeneratedCv>
   renderCvDocx: (profile: Profile, content: GeneratedCv) => Promise<Buffer>
   uploadCvDocx: (applicationId: string, buffer: Buffer) => Promise<string>
   saveCvVersion: (applicationId: string, storagePath: string, generatedJson: GeneratedCv) => Promise<void>
   saveInterviewQuestions: (applicationId: string, questions: GeneratedCv['interviewQuestions']) => Promise<void>
 }
 
-export async function runCvGeneration(deps: GenerateCvDeps, applicationId: string): Promise<void> {
+export async function runCvGeneration(deps: GenerateCvDeps, applicationId: string, language: CvLanguage): Promise<void> {
   const application = await deps.getApplication(applicationId)
 
   const masterData = await deps.getMasterDataBank()
@@ -34,7 +35,7 @@ export async function runCvGeneration(deps: GenerateCvDeps, applicationId: strin
     throw new CvGenerationError('Banco mestre vazio pra esse usuario — rode o importador antes de gerar um CV.')
   }
 
-  const generated = await deps.generateTailoredCv(masterData, application.job_description_raw)
+  const generated = await deps.generateTailoredCv(masterData, application.job_description_raw, language)
   if (generated.selectedAchievements.length === 0) {
     throw new CvGenerationError('Nenhuma conquista do banco mestre e relevante pra essa vaga especifica. Adicione conquistas relacionadas antes de gerar (ou confirme que essa vaga realmente nao combina com o seu perfil atual).')
   }
