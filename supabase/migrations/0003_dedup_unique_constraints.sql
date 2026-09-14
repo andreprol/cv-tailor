@@ -2,31 +2,35 @@
 -- unico falha na criacao se ja existir duplicata na tabela). Mantem a linha
 -- mais antiga por created_at, apaga o resto. Mesmo criterio de normalizacao
 -- (trim + lowercase + colapsar espacos) usado pelo app ate hoje.
+-- id entra como tie-breaker para garantir ordem total mesmo quando
+-- created_at empata (ex: insercao em lote no mesmo statement).
+
+begin;
 
 delete from achievements a using achievements b
 where a.user_id = b.user_id
   and lower(trim(regexp_replace(a.company, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.company, '\s+', ' ', 'g')))
   and lower(trim(regexp_replace(a.role_title, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.role_title, '\s+', ' ', 'g')))
   and lower(trim(regexp_replace(a.bullet, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.bullet, '\s+', ' ', 'g')))
-  and a.created_at > b.created_at;
+  and (a.created_at, a.id) > (b.created_at, b.id);
 
 delete from skills a using skills b
 where a.user_id = b.user_id
   and lower(trim(regexp_replace(a.name, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.name, '\s+', ' ', 'g')))
-  and a.created_at > b.created_at;
+  and (a.created_at, a.id) > (b.created_at, b.id);
 
 delete from education a using education b
 where a.user_id = b.user_id
   and lower(trim(regexp_replace(a.institution, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.institution, '\s+', ' ', 'g')))
   and lower(trim(regexp_replace(a.degree, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.degree, '\s+', ' ', 'g')))
-  and a.created_at > b.created_at;
+  and (a.created_at, a.id) > (b.created_at, b.id);
 
 delete from certifications a using certifications b
 where a.user_id = b.user_id
   and lower(trim(regexp_replace(a.name, '\s+', ' ', 'g'))) = lower(trim(regexp_replace(b.name, '\s+', ' ', 'g')))
   and lower(trim(regexp_replace(coalesce(a.issuer, ''), '\s+', ' ', 'g'))) = lower(trim(regexp_replace(coalesce(b.issuer, ''), '\s+', ' ', 'g')))
   and coalesce(a.issued_on::text, '') = coalesce(b.issued_on::text, '')
-  and a.created_at > b.created_at;
+  and (a.created_at, a.id) > (b.created_at, b.id);
 
 -- Colunas geradas normalizadas + indice unico por tabela.
 
@@ -56,3 +60,5 @@ alter table certifications
   add column issued_on_norm text generated always as (coalesce(issued_on::text, '')) stored;
 
 create unique index certifications_dedup_idx on certifications (user_id, name_norm, issuer_norm, issued_on_norm);
+
+commit;
