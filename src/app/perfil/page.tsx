@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { getMasterDataBank } from '@/lib/repository'
@@ -57,7 +58,12 @@ export default async function PerfilPage() {
 
   return (
     <main className="container">
-      <h1>Perfil</h1>
+      <div className="section-header">
+        <h1>Perfil</h1>
+        <Link href="/applications/new" className="btn btn-primary">
+          + Nova candidatura
+        </Link>
+      </div>
       <p className="hint">Suba um CV (PDF ou DOCX) pra alimentar seu banco de dados. Edite ou apague qualquer item quando quiser — a revisão nunca é obrigatória.</p>
 
       <UploadCvForm />
