@@ -61,6 +61,15 @@ Responda APENAS com um JSON no formato exato:
 {"sufficientMatch": true, "matchWarning": null, "headline": "...", "summary": "...", "selectedAchievements": [{"achievementId": "...", "bullet": "..."}], "keywords": ["..."], "interviewQuestions": [{"question": "...", "rationale": "..."}]}`
 }
 
+// Removes a comma or space sitting between two digits (thousands grouping,
+// e.g. "1,000" -> "1000"), so a faithful reformat during translation doesn't
+// look like an altered number. Deliberately leaves periods alone — those are
+// ambiguous between a decimal point ("2.5%") and end-of-sentence punctuation,
+// and mishandling that would be worse than not normalizing periods at all.
+function normalizeNumberGrouping(text: string): string {
+  return text.replace(/(\d)[,\s](?=\d)/g, '$1')
+}
+
 function extractDigits(text: string): string[] {
   return text.match(/\d+/g) ?? []
 }
@@ -81,7 +90,13 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     // A model quirk (not a fabrication signal) can select the same real
     // achievement twice — drop the repeat instead of rendering the same
     // bullet twice in the final document.
-    if (seenIds.has(selected.achievementId)) continue
+    if (seenIds.has(selected.achievementId)) {
+      // Not a fabrication signal (the id already proved real), but repeated
+      // selection can mean the model is short on distinct real matches for
+      // this vaga — worth a trace even though there's nothing to throw on.
+      console.warn(`assembleGeneratedCv: achievementId "${selected.achievementId}" selecionado mais de uma vez, ignorando repeticao.`)
+      continue
+    }
     seenIds.add(selected.achievementId)
 
     const real = masterData.achievements.find((a) => a.id === selected.achievementId)
@@ -97,7 +112,9 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     // (tolerant of reformatting like "30%" -> "30 percent", but catches an
     // altered number like "50%").
     if (real.metric) {
-      const missingDigits = extractDigits(real.metric).filter((digit) => !containsWholeNumber(selected.bullet, digit))
+      const normalizedMetric = normalizeNumberGrouping(real.metric)
+      const normalizedBullet = normalizeNumberGrouping(selected.bullet)
+      const missingDigits = extractDigits(normalizedMetric).filter((digit) => !containsWholeNumber(normalizedBullet, digit))
       if (missingDigits.length > 0) {
         throw new Error(`Numero/metrica alterado na traducao (possivel alucinacao): conquista "${real.bullet}" tem metrica real "${real.metric}", mas o bullet gerado nao contem ${missingDigits.join(', ')}.`)
       }

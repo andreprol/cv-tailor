@@ -5,6 +5,7 @@ import type { MasterDataBank } from '../src/lib/types'
 const masterData: MasterDataBank = {
   achievements: [
     { id: '1', user_id: '1', company: 'Delirio Tropical', role_title: 'IT Manager', start_date: '2014-10-01', end_date: null, bullet: 'Reduced Cost of Goods Sold by 5%.', metric: '5%', positioning: ['TPM'] },
+    { id: '2', user_id: '1', company: 'Acme Corp', role_title: 'TPM', start_date: '2020-01-01', end_date: null, bullet: 'Saved $1,000 in vendor costs.', metric: '$1,000', positioning: ['TPM'] },
   ],
   skills: [{ id: '1', user_id: '1', name: 'SAP Business One', category: 'ERP', positioning: ['TPM'] }],
   education: [],
@@ -85,6 +86,33 @@ describe('assembleGeneratedCv', () => {
       interviewQuestions: [],
     } as any
     expect(() => assembleGeneratedCv(masterData, model)).toThrow(/alucina/)
+  })
+
+  it('does not false-positive when a thousands separator is added or removed during translation', () => {
+    const withoutComma = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      // Real metric is "$1,000" — bullet drops the comma, same real number.
+      selectedAchievements: [{ achievementId: '2', bullet: 'Saved $1000 in vendor costs.' }],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+    expect(() => assembleGeneratedCv(masterData, withoutComma)).not.toThrow()
+
+    const genuinelyAltered = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      // Real metric is "$1,000" — this is a different number, not a
+      // reformat, so it must still be caught.
+      selectedAchievements: [{ achievementId: '2', bullet: 'Saved $10000 in vendor costs.' }],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+    expect(() => assembleGeneratedCv(masterData, genuinelyAltered)).toThrow(/alucina/)
   })
 
   it('deduplicates a repeated achievementId instead of rendering the same achievement twice', () => {
