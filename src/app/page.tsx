@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { listApplications } from '@/lib/repository'
+import { DeleteApplicationButton } from './delete-application-button'
 
 export default async function DashboardPage({
   searchParams,
@@ -55,6 +56,7 @@ export default async function DashboardPage({
               <th>Cargo</th>
               <th>Status</th>
               <th>Candidatado em</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -64,6 +66,7 @@ export default async function DashboardPage({
                 <td>{app.role_title}</td>
                 <td><span className={`badge badge--${app.status}`}>{app.status.replace('_', ' ')}</span></td>
                 <td className="muted">{app.applied_at}</td>
+                <td><DeleteApplicationButton applicationId={app.id} /></td>
               </tr>
             ))}
           </tbody>
