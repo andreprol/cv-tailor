@@ -40,6 +40,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="CV-${sanitizeFilename(application.company)}.pdf"`,
+      'Cache-Control': 'no-store',
     },
   })
 }
