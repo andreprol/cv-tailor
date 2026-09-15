@@ -10,6 +10,7 @@ export interface ItemField {
   label: string
   value: string
   multiline?: boolean
+  inputType?: 'text' | 'date' | 'checkbox'
 }
 
 export interface ProfileItem {
@@ -40,11 +41,25 @@ function ProfileItemRow({ table, item }: { table: ProfileItemTable; item: Profil
         {state.error && <div className="alert alert-error" role="alert">{state.error}</div>}
         {item.fields.map((field) => (
           <div className="field" key={field.name}>
-            <label htmlFor={`${item.id}-${field.name}`}>{field.label}</label>
-            {field.multiline ? (
-              <textarea id={`${item.id}-${field.name}`} name={field.name} defaultValue={field.value} rows={3} />
+            {field.inputType === 'checkbox' ? (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input name={field.name} type="checkbox" value="on" defaultChecked={field.value === 'true'} />
+                {field.label}
+              </label>
             ) : (
-              <input id={`${item.id}-${field.name}`} name={field.name} defaultValue={field.value} />
+              <>
+                <label htmlFor={`${item.id}-${field.name}`}>{field.label}</label>
+                {field.multiline ? (
+                  <textarea id={`${item.id}-${field.name}`} name={field.name} defaultValue={field.value} rows={3} />
+                ) : (
+                  <input
+                    id={`${item.id}-${field.name}`}
+                    name={field.name}
+                    type={field.inputType === 'date' ? 'date' : 'text'}
+                    defaultValue={field.value}
+                  />
+                )}
+              </>
             )}
           </div>
         ))}
