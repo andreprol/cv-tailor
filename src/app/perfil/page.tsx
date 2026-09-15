@@ -1,15 +1,17 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUserId } from '@/lib/supabase/auth-server'
-import { getMasterDataBank } from '@/lib/repository'
+import { getMasterDataBank, getProfile } from '@/lib/repository'
 import { UploadCvForm } from './upload-cv-form'
 import { ProfileItemList, type ProfileItem } from './profile-item-list'
 import { AddProfileItemForm } from './add-profile-item-form'
+import { GithubSection } from './github-section'
 
 export default async function PerfilPage() {
   const userId = await getCurrentUserId()
   const db = createServiceClient()
   const masterData = await getMasterDataBank(db, userId)
+  const profile = await getProfile(db, userId)
 
   const achievementItems: ProfileItem[] = masterData.achievements.map((a) => ({
     id: a.id,
@@ -78,6 +80,9 @@ export default async function PerfilPage() {
       <p className="hint">Suba um CV (PDF ou DOCX) pra alimentar seu banco de dados. Edite ou apague qualquer item quando quiser — a revisão nunca é obrigatória.</p>
 
       <UploadCvForm />
+
+      <h2>GitHub</h2>
+      <GithubSection githubUrl={profile.github_url} />
 
       <h2>Conquistas</h2>
       <AddProfileItemForm table="achievements" />
