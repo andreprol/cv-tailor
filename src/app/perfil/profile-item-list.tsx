@@ -8,6 +8,7 @@ import type { ProfileItemTable } from '@/lib/repository'
 export interface ItemField {
   name: string
   label: string
+  /** For inputType: 'checkbox', must be exactly the string 'true' or 'false' (checked iff === 'true'). */
   value: string
   multiline?: boolean
   inputType?: 'text' | 'date' | 'checkbox'
@@ -43,7 +44,7 @@ function ProfileItemRow({ table, item }: { table: ProfileItemTable; item: Profil
           <div className="field" key={field.name}>
             {field.inputType === 'checkbox' ? (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input name={field.name} type="checkbox" value="on" defaultChecked={field.value === 'true'} />
+                <input id={`${item.id}-${field.name}`} name={field.name} type="checkbox" value="on" defaultChecked={field.value === 'true'} />
                 {field.label}
               </label>
             ) : (
