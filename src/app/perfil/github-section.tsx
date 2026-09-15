@@ -22,6 +22,9 @@ export function GithubSection({ githubUrl }: { githubUrl: string | null }) {
         </button>
       </form>
       {updateState.error && <div className="alert alert-error" role="alert" style={{ marginTop: 8 }}>{updateState.error}</div>}
+      {!updateState.error && updateState.savedAt > 0 && (
+        <div className="alert alert-info" role="status" style={{ marginTop: 8 }}>Salvo!</div>
+      )}
 
       <form action={importFormAction} style={{ marginTop: 12 }}>
         <button type="submit" disabled={importPending} className="btn btn-primary">
