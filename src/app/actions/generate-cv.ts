@@ -55,11 +55,11 @@ export async function generateCvAction(
   } catch (error) {
     console.error('generateCvAction: falha ao gerar CV:', error)
     // CvGenerationError is runCvGeneration's own deliberate, safe,
-    // user-facing message (banco mestre vazio / nenhuma conquista relevante /
-    // matchWarning do modelo) — show it as-is. Anything else here is a raw
-    // infra error (Postgrest/Supabase from repo.updateJobDescription above,
-    // or from the deps inside runCvGeneration — storage upload, docx
-    // rendering, Anthropic) that must not reach the client verbatim.
+    // user-facing message (banco mestre vazio) — show it as-is. Anything else
+    // here is a raw infra error (Postgrest/Supabase from
+    // repo.updateJobDescription above, or from the deps inside
+    // runCvGeneration — storage upload, docx rendering, Anthropic) that must
+    // not reach the client verbatim.
     if (error instanceof CvGenerationError) {
       return { error: error.message }
     }

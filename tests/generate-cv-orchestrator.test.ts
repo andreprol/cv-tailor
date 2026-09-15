@@ -66,6 +66,26 @@ describe('runCvGeneration', () => {
     )
   })
 
+  it('backfills a matchWarning when sufficientMatch is false and the model forgot to explain why, even with some achievements selected', async () => {
+    const deps = makeDeps({
+      generateTailoredCv: vi.fn().mockResolvedValue({
+        sufficientMatch: false, matchWarning: null,
+        headline: 'X', summary: 'Y',
+        selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real' }],
+        keywords: [], interviewQuestions: [],
+      }),
+    })
+
+    await runCvGeneration(deps, 'app-1', 'pt')
+
+    expect(deps.uploadCvDocx).toHaveBeenCalled()
+    expect(deps.saveCvVersion).toHaveBeenCalledWith(
+      'app-1',
+      'app-1.docx',
+      expect.objectContaining({ matchWarning: expect.stringContaining('Nenhuma conquista') }),
+    )
+  })
+
   it('generates the CV anyway when sufficientMatch is false, preserving the model\'s own matchWarning untouched (real case: a Web3 posting against a TPM-only bank got 3 real, verbatim, but topically irrelevant achievements selected — the app must not decide for the user whether the vaga is worth applying to)', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
