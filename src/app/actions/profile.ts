@@ -47,7 +47,14 @@ export async function importGithubAction(_prevState: ImportGithubState, _formDat
   }
 
   const db = createServiceClient()
-  const profile = await getProfile(db, userId)
+
+  let profile
+  try {
+    profile = await getProfile(db, userId)
+  } catch (error) {
+    console.error('importGithubAction: falha ao carregar perfil:', error)
+    return { error: 'Erro ao carregar perfil. Tente novamente.', message: null }
+  }
 
   if (!profile.github_url) {
     return { error: 'Salve a URL do GitHub no perfil antes de importar.', message: null }
