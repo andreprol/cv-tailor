@@ -31,6 +31,11 @@ export async function getProfile(db: SupabaseClient, userId: string): Promise<Pr
   return data
 }
 
+export async function updateProfile(db: SupabaseClient, userId: string, fields: Partial<Pick<Profile, 'github_url' | 'linkedin_url'>>): Promise<void> {
+  const { error } = await db.from('profile').update(fields).eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function createApplication(
   db: SupabaseClient,
   userId: string,
