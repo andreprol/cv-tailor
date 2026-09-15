@@ -36,17 +36,14 @@ export async function runCvGeneration(deps: GenerateCvDeps, applicationId: strin
   }
 
   const generated = await deps.generateTailoredCv(masterData, application.job_description_raw, language)
-  if (generated.selectedAchievements.length === 0) {
-    throw new CvGenerationError('Nenhuma conquista do banco mestre e relevante pra essa vaga especifica. Adicione conquistas relacionadas antes de gerar (ou confirme que essa vaga realmente nao combina com o seu perfil atual).')
-  }
-  // Real testing showed the model can still pick a few technically-real
-  // achievements (passing the check above) for a vaga that doesn't actually
-  // match — e.g. picking generic TPM bullets for a Rust/Soroban role. It
-  // reliably self-reports this via sufficientMatch/matchWarning (see the
-  // prompt), so trust that judgment and block before a misleading résumé
-  // ever gets rendered.
-  if (!generated.sufficientMatch) {
-    throw new CvGenerationError(generated.matchWarning ?? 'O banco mestre nao cobre os requisitos tecnicos centrais dessa vaga.')
+
+  // Não bloqueia mais por julgamento de match (sufficientMatch/selectedAchievements vazio) — o
+  // usuário decide se quer se candidatar; a aplicação só maximiza a chance de passar no ATS e
+  // chegar na parte humana. Se a IA não achou nenhuma conquista relevante e também não preencheu
+  // matchWarning sozinha, garante que sempre existe um aviso pra mostrar na tela (nunca no
+  // documento em si — nem docx-template.ts nem pdf-template.ts leem esse campo).
+  if (generated.selectedAchievements.length === 0 && !generated.matchWarning) {
+    generated.matchWarning = 'Nenhuma conquista do banco combina diretamente com essa vaga — CV gerado só com resumo/skills.'
   }
 
   const profile = await deps.getProfile()

@@ -48,7 +48,7 @@ describe('runCvGeneration', () => {
     expect(deps.uploadCvDocx).not.toHaveBeenCalled()
   })
 
-  it('throws when Claude finds no relevant achievements for this posting', async () => {
+  it('generates the CV anyway when Claude finds no relevant achievements, backfilling a matchWarning', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
         sufficientMatch: false, matchWarning: null,
@@ -56,11 +56,17 @@ describe('runCvGeneration', () => {
       }),
     })
 
-    await expect(runCvGeneration(deps, 'app-1', 'pt')).rejects.toThrow(/relevante/)
-    expect(deps.uploadCvDocx).not.toHaveBeenCalled()
+    await runCvGeneration(deps, 'app-1', 'pt')
+
+    expect(deps.uploadCvDocx).toHaveBeenCalled()
+    expect(deps.saveCvVersion).toHaveBeenCalledWith(
+      'app-1',
+      'app-1.docx',
+      expect.objectContaining({ matchWarning: expect.stringContaining('Nenhuma conquista') }),
+    )
   })
 
-  it('throws with the model\'s own matchWarning when it picked real-but-irrelevant achievements for a mismatched vaga (real bug: a Web3 posting against a TPM-only bank got 3 real, verbatim, but topically irrelevant achievements selected, and the model wrote its honest "this is not a good fit" assessment into the résumé\'s own summary field instead of blocking)', async () => {
+  it('generates the CV anyway when sufficientMatch is false, preserving the model\'s own matchWarning untouched (real case: a Web3 posting against a TPM-only bank got 3 real, verbatim, but topically irrelevant achievements selected — the app must not decide for the user whether the vaga is worth applying to)', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
         sufficientMatch: false,
@@ -73,9 +79,14 @@ describe('runCvGeneration', () => {
       }),
     })
 
-    await expect(runCvGeneration(deps, 'app-1', 'pt')).rejects.toThrow(/Rust\/Solidity\/Soroban/)
-    expect(deps.renderCvDocx).not.toHaveBeenCalled()
-    expect(deps.uploadCvDocx).not.toHaveBeenCalled()
-    expect(deps.saveCvVersion).not.toHaveBeenCalled()
+    await runCvGeneration(deps, 'app-1', 'pt')
+
+    expect(deps.renderCvDocx).toHaveBeenCalled()
+    expect(deps.uploadCvDocx).toHaveBeenCalled()
+    expect(deps.saveCvVersion).toHaveBeenCalledWith(
+      'app-1',
+      'app-1.docx',
+      expect.objectContaining({ matchWarning: 'Banco de dados nao tem experiencia real em Rust/Solidity/Soroban, exigidos pela vaga.' }),
+    )
   })
 })
