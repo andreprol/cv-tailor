@@ -27,9 +27,12 @@ export async function fetchGithubRepos(username: string, fetchFn: typeof fetch =
 }
 
 export async function fetchGithubLanguages(username: string, repo: string, fetchFn: typeof fetch = fetch): Promise<Record<string, number>> {
-  const res = await fetchFn(`https://api.github.com/repos/${username}/${repo}/languages`, {
+  const res = await fetchFn(`https://api.github.com/repos/${username}/${encodeURIComponent(repo)}/languages`, {
     headers: { Accept: 'application/vnd.github+json' },
   })
+  if (res.status === 403 || res.status === 429) {
+    throw new Error(`GitHub API retornou ${res.status} (provavel rate limit) ao buscar linguagens de "${username}/${repo}".`)
+  }
   if (!res.ok) return {}
   return res.json()
 }

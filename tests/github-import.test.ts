@@ -58,6 +58,12 @@ describe('fetchGithubLanguages', () => {
 
     expect(languages).toEqual({})
   })
+
+  it('throws on a rate-limit status (403) instead of silently returning empty', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({}, false, 403))
+
+    await expect(fetchGithubLanguages('andreprol', 'algum-repo', fetchFn)).rejects.toThrow('403')
+  })
 })
 
 describe('buildGithubImport', () => {
