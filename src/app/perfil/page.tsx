@@ -4,6 +4,7 @@ import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { getMasterDataBank } from '@/lib/repository'
 import { UploadCvForm } from './upload-cv-form'
 import { ProfileItemList, type ProfileItem } from './profile-item-list'
+import { AddProfileItemForm } from './add-profile-item-form'
 
 export default async function PerfilPage() {
   const userId = await getCurrentUserId()
@@ -20,6 +21,8 @@ export default async function PerfilPage() {
       { name: 'role_title', label: 'Cargo', value: a.role_title },
       { name: 'bullet', label: 'Conquista', value: a.bullet, multiline: true },
       { name: 'metric', label: 'Métrica', value: a.metric ?? '' },
+      { name: 'start_date', label: 'Data de início', value: a.start_date, inputType: 'date' },
+      { name: 'end_date', label: 'Data de fim', value: a.end_date ?? '', inputType: 'date' },
     ],
   }))
 
@@ -31,6 +34,8 @@ export default async function PerfilPage() {
     fields: [
       { name: 'institution', label: 'Instituição', value: e.institution },
       { name: 'degree', label: 'Curso', value: e.degree },
+      { name: 'completed_on', label: 'Data de conclusão', value: e.completed_on ?? '', inputType: 'date' },
+      { name: 'in_progress', label: 'Em andamento', value: String(e.in_progress), inputType: 'checkbox' },
     ],
   }))
 
@@ -53,6 +58,7 @@ export default async function PerfilPage() {
     fields: [
       { name: 'name', label: 'Certificação', value: c.name },
       { name: 'issuer', label: 'Emissor', value: c.issuer ?? '' },
+      { name: 'issued_on', label: 'Data de emissão', value: c.issued_on ?? '', inputType: 'date' },
     ],
   }))
 
@@ -74,15 +80,19 @@ export default async function PerfilPage() {
       <UploadCvForm />
 
       <h2>Conquistas</h2>
+      <AddProfileItemForm table="achievements" />
       <ProfileItemList table="achievements" items={achievementItems} />
 
       <h2>Formação</h2>
+      <AddProfileItemForm table="education" />
       <ProfileItemList table="education" items={educationItems} />
 
       <h2>Skills</h2>
+      <AddProfileItemForm table="skills" />
       <ProfileItemList table="skills" items={skillItems} />
 
       <h2>Certificações</h2>
+      <AddProfileItemForm table="certifications" />
       <ProfileItemList table="certifications" items={certificationItems} />
     </main>
   )
