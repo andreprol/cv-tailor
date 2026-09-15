@@ -65,20 +65,20 @@ export async function updateProfileItemAction(
 
   const db = createServiceClient()
 
-  const fields: Record<string, string | null> = {}
+  const fields: Record<string, string | boolean | null> = {}
   for (const key of EDITABLE_FIELDS[validTable]) {
     const value = formData.get(key)
     if (value !== null) fields[key] = String(value)
   }
 
-  if (validTable === 'achievements') {
+  if (validTable === 'achievements' && formData.has('end_date')) {
     fields.end_date = optionalDate(formData, 'end_date')
   }
   if (validTable === 'education') {
-    fields.completed_on = optionalDate(formData, 'completed_on')
-    fields.in_progress = formData.get('in_progress') === 'on' ? 'true' : 'false'
+    if (formData.has('completed_on')) fields.completed_on = optionalDate(formData, 'completed_on')
+    fields.in_progress = formData.get('in_progress') === 'on'
   }
-  if (validTable === 'certifications') {
+  if (validTable === 'certifications' && formData.has('issued_on')) {
     fields.issued_on = optionalDate(formData, 'issued_on')
   }
 
