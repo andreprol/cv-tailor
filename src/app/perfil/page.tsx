@@ -6,6 +6,7 @@ import { UploadCvForm } from './upload-cv-form'
 import { ProfileItemList, type ProfileItem } from './profile-item-list'
 import { AddProfileItemForm } from './add-profile-item-form'
 import { GithubSection } from './github-section'
+import { UploadCertificateForm } from './upload-certificate-form'
 
 export default async function PerfilPage() {
   const userId = await getCurrentUserId()
@@ -97,6 +98,7 @@ export default async function PerfilPage() {
       <ProfileItemList table="skills" items={skillItems} />
 
       <h2>Certificações</h2>
+      <UploadCertificateForm />
       <AddProfileItemForm table="certifications" />
       <ProfileItemList table="certifications" items={certificationItems} />
     </main>
