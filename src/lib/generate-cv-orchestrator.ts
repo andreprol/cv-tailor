@@ -3,8 +3,8 @@ import type { CvLanguage } from './claude-generation'
 import type { Application, MasterDataBank, Profile } from './types'
 
 // Marks an error as one of runCvGeneration's own deliberate, user-facing
-// messages (banco mestre vazio / nenhuma conquista relevante / matchWarning
-// do modelo) — safe to show to the client as-is. Anything else thrown out of
+// messages (banco mestre vazio) — safe to show to the client as-is.
+// Anything else thrown out of
 // this pipeline (from the injected deps: Postgrest/Supabase, the Anthropic
 // SDK, docx rendering, storage upload) is raw infra detail and must be
 // genericized by the caller instead of shown verbatim. See
