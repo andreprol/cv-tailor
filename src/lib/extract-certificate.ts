@@ -6,8 +6,12 @@ const EXTRACTION_PROMPT = `Este documento e um certificado de curso/treinamento.
 {"certifications": [{"name": "nome exato do curso", "issuer": "instituicao/plataforma que emitiu, ou null se nao identificavel", "issuedOn": "YYYY-MM-DD ou null se a data nao aparecer"}]}
 Normalmente e um curso so por documento, mas liste todos se houver mais de um. Responda APENAS com o JSON.`
 
-export type CertificateFileKind = 'pdf' | 'docx' | 'image'
 export type ImageMediaType = 'image/jpeg' | 'image/png'
+
+export type CertificateInput =
+  | { kind: 'pdf'; buffer: Buffer }
+  | { kind: 'docx'; buffer: Buffer }
+  | { kind: 'image'; buffer: Buffer; mediaType: ImageMediaType }
 
 // claude-sonnet-5 uses extended thinking by default, which consumes part of
 // max_tokens before the model starts writing its answer — the same root
@@ -68,20 +72,19 @@ async function callOnceImage(anthropic: Anthropic, buffer: Buffer, mediaType: Im
   return parseCertificateExtraction(textBlock.text)
 }
 
-export async function extractCertificateData(anthropic: Anthropic, kind: CertificateFileKind, buffer: Buffer, imageMediaType?: ImageMediaType): Promise<CertificateExtraction> {
-  if (kind === 'pdf') {
+export async function extractCertificateData(anthropic: Anthropic, input: CertificateInput): Promise<CertificateExtraction> {
+  if (input.kind === 'pdf') {
     try {
-      return await callOncePdf(anthropic, buffer)
+      return await callOncePdf(anthropic, input.buffer)
     } catch {
-      return await callOncePdf(anthropic, buffer)
+      return await callOncePdf(anthropic, input.buffer)
     }
   }
-  if (kind === 'image') {
-    if (!imageMediaType) throw new Error('imageMediaType obrigatorio para kind "image".')
+  if (input.kind === 'image') {
     try {
-      return await callOnceImage(anthropic, buffer, imageMediaType)
+      return await callOnceImage(anthropic, input.buffer, input.mediaType)
     } catch {
-      return await callOnceImage(anthropic, buffer, imageMediaType)
+      return await callOnceImage(anthropic, input.buffer, input.mediaType)
     }
   }
 
@@ -89,7 +92,7 @@ export async function extractCertificateData(anthropic: Anthropic, kind: Certifi
   // a corrupt/unparseable buffer fails identically every time. Extract once,
   // outside the retry loop, so the retry only covers the actual Claude call
   // (matches the same reasoning already applied in import-cv.ts).
-  const { value: text } = await mammoth.extractRawText({ buffer })
+  const { value: text } = await mammoth.extractRawText({ buffer: input.buffer })
   try {
     return await callOnceDocx(anthropic, text)
   } catch {
