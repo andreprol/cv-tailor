@@ -4,6 +4,7 @@ import { getCurrentUserId } from '@/lib/supabase/auth-server'
 import { getApplicationDetail } from '@/lib/repository'
 import { getCvDownloadUrl } from '@/lib/storage'
 import { updateStatusAction } from '@/app/actions/update-status'
+import { generatedCvSchema } from '@/lib/generation-schema'
 import { GenerateCvForm } from './generate-cv-form'
 import type { ApplicationStatus } from '@/lib/types'
 
@@ -21,6 +22,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const db = createServiceClient()
   const { application, cvVersion, interviewQuestions } = await getApplicationDetail(db, id, userId)
   const downloadUrl = cvVersion ? await getCvDownloadUrl(db, cvVersion.storage_path) : null
+  const matchWarning = cvVersion ? generatedCvSchema.parse(cvVersion.generated_json).matchWarning : null
 
   async function setStatus(formData: FormData) {
     'use server'
@@ -56,6 +58,11 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       {cvVersion && downloadUrl && (
         <>
           <h2>CV gerado</h2>
+          {matchWarning && (
+            <div className="alert alert-info" role="status" style={{ marginBottom: 12 }}>
+              ⚠️ {matchWarning}
+            </div>
+          )}
           <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <span>Currículo pronto, ATS-safe, sob medida pra essa vaga.</span>
             <div style={{ display: 'flex', gap: 8 }}>
