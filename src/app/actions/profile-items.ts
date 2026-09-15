@@ -131,41 +131,54 @@ export async function addProfileItemAction(
   try {
     let inserted: number
 
-    if (validTable === 'achievements') {
-      const company = String(formData.get('company') ?? '').trim()
-      const roleTitle = String(formData.get('role_title') ?? '').trim()
-      const bullet = String(formData.get('bullet') ?? '').trim()
-      const metric = String(formData.get('metric') ?? '').trim() || null
-      const startDate = String(formData.get('start_date') ?? '').trim()
-      const endDate = String(formData.get('end_date') ?? '').trim() || null
-      if (!company || !roleTitle || !bullet || !startDate) {
-        return { error: 'Empresa, cargo, conquista e data de início são obrigatórios.', addedAt: _prevState.addedAt }
+    switch (validTable) {
+      case 'achievements': {
+        const company = String(formData.get('company') ?? '').trim()
+        const roleTitle = String(formData.get('role_title') ?? '').trim()
+        const bullet = String(formData.get('bullet') ?? '').trim()
+        const metric = String(formData.get('metric') ?? '').trim() || null
+        const startDate = String(formData.get('start_date') ?? '').trim()
+        const endDate = String(formData.get('end_date') ?? '').trim() || null
+        if (!company || !roleTitle || !bullet || !startDate) {
+          return { error: 'Empresa, cargo, conquista e data de início são obrigatórios.', addedAt: _prevState.addedAt }
+        }
+        inserted = await insertAchievements(db, userId, positioning, [{ company, roleTitle, startDate, endDate, bullet, metric }])
+        break
       }
-      inserted = await insertAchievements(db, userId, positioning, [{ company, roleTitle, startDate, endDate, bullet, metric }])
-    } else if (validTable === 'skills') {
-      const name = String(formData.get('name') ?? '').trim()
-      const category = String(formData.get('category') ?? '').trim()
-      if (!name || !category) {
-        return { error: 'Nome e categoria são obrigatórios.', addedAt: _prevState.addedAt }
+      case 'skills': {
+        const name = String(formData.get('name') ?? '').trim()
+        const category = String(formData.get('category') ?? '').trim()
+        if (!name || !category) {
+          return { error: 'Nome e categoria são obrigatórios.', addedAt: _prevState.addedAt }
+        }
+        inserted = await insertSkills(db, userId, positioning, [{ name, category }])
+        break
       }
-      inserted = await insertSkills(db, userId, positioning, [{ name, category }])
-    } else if (validTable === 'education') {
-      const institution = String(formData.get('institution') ?? '').trim()
-      const degree = String(formData.get('degree') ?? '').trim()
-      const inProgress = formData.get('in_progress') === 'on'
-      const completedOn = inProgress ? null : (String(formData.get('completed_on') ?? '').trim() || null)
-      if (!institution || !degree) {
-        return { error: 'Instituição e curso são obrigatórios.', addedAt: _prevState.addedAt }
+      case 'education': {
+        const institution = String(formData.get('institution') ?? '').trim()
+        const degree = String(formData.get('degree') ?? '').trim()
+        const inProgress = formData.get('in_progress') === 'on'
+        const completedOn = inProgress ? null : (String(formData.get('completed_on') ?? '').trim() || null)
+        if (!institution || !degree) {
+          return { error: 'Instituição e curso são obrigatórios.', addedAt: _prevState.addedAt }
+        }
+        inserted = await insertEducation(db, userId, positioning, [{ institution, degree, completedOn, inProgress }])
+        break
       }
-      inserted = await insertEducation(db, userId, positioning, [{ institution, degree, completedOn, inProgress }])
-    } else {
-      const name = String(formData.get('name') ?? '').trim()
-      const issuer = String(formData.get('issuer') ?? '').trim() || null
-      const issuedOn = String(formData.get('issued_on') ?? '').trim() || null
-      if (!name) {
-        return { error: 'Nome da certificação é obrigatório.', addedAt: _prevState.addedAt }
+      case 'certifications': {
+        const name = String(formData.get('name') ?? '').trim()
+        const issuer = String(formData.get('issuer') ?? '').trim() || null
+        const issuedOn = String(formData.get('issued_on') ?? '').trim() || null
+        if (!name) {
+          return { error: 'Nome da certificação é obrigatório.', addedAt: _prevState.addedAt }
+        }
+        inserted = await insertCertifications(db, userId, positioning, [{ name, issuer, issuedOn }])
+        break
       }
-      inserted = await insertCertifications(db, userId, positioning, [{ name, issuer, issuedOn }])
+      default: {
+        const exhaustiveCheck: never = validTable
+        throw new Error(`Tabela nao tratada: ${exhaustiveCheck}`)
+      }
     }
 
     if (inserted === 0) {
