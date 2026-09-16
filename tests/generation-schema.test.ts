@@ -6,6 +6,7 @@ const validJson = JSON.stringify({
   matchWarning: null,
   headline: 'Technical Program Manager',
   summary: 'Summary text',
+  coverLetter: 'Cover letter text',
   selectedAchievements: [{ achievementId: '1', bullet: 'Reduced COGS by 5%' }],
   keywords: ['SAP B1', 'Agile'],
   interviewQuestions: [{ question: 'Tell me about a time you led a cross-functional program', rationale: 'Matches the "cross-functional" requirement in the posting' }],
@@ -25,6 +26,7 @@ describe('parseModelCvResponse', () => {
       matchWarning: 'Banco de dados nao tem experiencia real em Rust/Soroban.',
       headline: 'Soroban Smart Contract Developer',
       summary: 'Summary text',
+      coverLetter: 'Cover letter text',
       selectedAchievements: [],
       keywords: [],
       interviewQuestions: [],
@@ -84,5 +86,22 @@ describe('generatedCvSchema', () => {
     const result = generatedCvSchema.parse(preExistingStoredRow)
     expect(result.language).toBe('pt')
     expect(result.education).toEqual([])
+    expect(result.coverLetter).toBe('')
+  })
+
+  it('parses a coverLetter when present', () => {
+    const withCoverLetter = generatedCvSchema.parse({
+      sufficientMatch: true,
+      matchWarning: null,
+      language: 'pt',
+      headline: 'Technical Program Manager',
+      summary: 'Summary',
+      coverLetter: 'Prezados(as), ...',
+      selectedAchievements: [],
+      education: [],
+      keywords: [],
+      interviewQuestions: [],
+    })
+    expect(withCoverLetter.coverLetter).toBe('Prezados(as), ...')
   })
 })

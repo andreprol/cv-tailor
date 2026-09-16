@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentUserId } from '@/lib/supabase/auth-server'
-import { getApplicationDetail } from '@/lib/repository'
+import { getApplicationDetail, getProfile } from '@/lib/repository'
 import { getCvDownloadUrl } from '@/lib/storage'
 import { updateStatusAction } from '@/app/actions/update-status'
 import { generatedCvSchema } from '@/lib/generation-schema'
 import { GenerateCvForm } from './generate-cv-form'
+import { CoverLetterBox } from './cover-letter-box'
 import type { ApplicationStatus } from '@/lib/types'
 
 const STATUS_OPTIONS: ApplicationStatus[] = ['sem_resposta', 'rejeitado', 'entrevista', 'oferta']
@@ -22,7 +23,12 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const db = createServiceClient()
   const { application, cvVersion, interviewQuestions } = await getApplicationDetail(db, id, userId)
   const downloadUrl = cvVersion ? await getCvDownloadUrl(db, cvVersion.storage_path) : null
-  const matchWarning = cvVersion ? generatedCvSchema.parse(cvVersion.generated_json).matchWarning : null
+  const generated = cvVersion ? generatedCvSchema.parse(cvVersion.generated_json) : null
+  const matchWarning = generated?.matchWarning ?? null
+  // getProfile throws on a missing row or a transient Postgrest error — never
+  // let that take down the whole page (CV, download links, interview
+  // questions). Worst case here is just hiding the cover letter section.
+  const profile = generated?.coverLetter ? await getProfile(db, userId).catch(() => null) : null
 
   async function setStatus(formData: FormData) {
     'use server'
@@ -70,6 +76,13 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
               <a href={`/applications/${application.id}/pdf`} className="btn btn-secondary">⬇ Baixar PDF</a>
             </div>
           </div>
+
+          {generated?.coverLetter && profile && (
+            <>
+              <h2>Cover letter</h2>
+              <CoverLetterBox coverLetter={generated.coverLetter} fullName={profile.full_name} />
+            </>
+          )}
 
           <h2>Perguntas prováveis de entrevista</h2>
           <ul className="qa-list">

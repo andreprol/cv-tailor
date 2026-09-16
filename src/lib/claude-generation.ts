@@ -18,7 +18,7 @@ export function buildGenerationPrompt(masterData: MasterDataBank, jobDescription
 
   return `Voce e um especialista em recrutamento tecnico e ATS. Gere um curriculo customizado pra vaga abaixo usando SOMENTE as conquistas e skills reais listadas no banco de dados. NUNCA invente conquista, metrica ou skill que nao esteja literalmente listada abaixo.
 
-IDIOMA OBRIGATORIO: escreva TODO o conteudo (headline, summary, bullets das conquistas, keywords, perguntas de entrevista e seus rationale) em ${languageLabel}, mesmo que o texto original do banco de dados esteja em outro idioma. Traduza mantendo os fatos e numeros EXATOS — nunca mude um numero, percentual ou metrica ao traduzir.
+IDIOMA OBRIGATORIO: escreva TODO o conteudo (headline, summary, cover letter, bullets das conquistas, keywords, perguntas de entrevista e seus rationale) em ${languageLabel}, mesmo que o texto original do banco de dados esteja em outro idioma. Traduza mantendo os fatos e numeros EXATOS — nunca mude um numero, percentual ou metrica ao traduzir.
 
 BANCO DE DADOS REAL:
 Conquistas:
@@ -37,11 +37,12 @@ Regras obrigatorias:
    tecnicos centrais da vaga, defina "sufficientMatch": false e explique o motivo em
    "matchWarning" (ex: "banco de dados nao tem nenhuma conquista real em Rust/Solidity/Soroban,
    exigidos pela vaga").
-2. **"summary" e "headline" sao parte do documento final que pode ser enviado a um recrutador de
-   verdade — NUNCA escreva ali um aviso, ressalva ou julgamento sobre a vaga nao combinar com o
-   perfil.** Esse tipo de avaliacao vai APENAS em "matchWarning". Se "sufficientMatch" for false,
-   ainda assim preencha "summary"/"headline"/"selectedAchievements" normalmente com o que houver de
-   mais proximo (serao descartados pelo sistema antes de chegar em qualquer documento).
+2. **"summary", "headline" e "coverLetter" sao parte de documentos finais que podem ser enviados a
+   um recrutador de verdade — NUNCA escreva ali um aviso, ressalva ou julgamento sobre a vaga nao
+   combinar com o perfil.** Esse tipo de avaliacao vai APENAS em "matchWarning". Se
+   "sufficientMatch" for false, ainda assim preencha "summary"/"headline"/"coverLetter"/
+   "selectedAchievements" normalmente com o que houver de mais proximo (serao descartados pelo
+   sistema antes de chegar em qualquer documento).
 3. O campo "headline" deve espelhar o titulo exato do cargo da vaga (traduzido pro idioma pedido se
    o titulo da vaga estiver em outro idioma).
 4. Cada item de "selectedAchievements" deve ter "achievementId" com o ID EXATO (o texto depois de
@@ -56,9 +57,17 @@ Regras obrigatorias:
 7. Gere tambem "interviewQuestions": 5 perguntas provaveis de entrevista pra essa vaga especifica,
    cada uma com "rationale" explicando por que essa pergunta e provavel pra essa vaga, ambos no
    idioma pedido.
+8. Gere tambem "coverLetter": uma carta de apresentacao curta (200 a 350 palavras) pra essa vaga
+   especifica, baseada SOMENTE nas conquistas reais do banco de dados (as mesmas usadas em
+   "selectedAchievements", nunca invente uma nova so pra carta). Estrutura: comece com uma saudacao
+   generica ("Prezados(as)," ou equivalente no idioma pedido — nunca invente o nome de uma pessoa
+   ou empresa que nao apareca na vaga), conecte 2 a 3 conquistas reais especificas aos requisitos
+   centrais da vaga em prosa corrida (nao lista de bullets), termine com um fechamento generico
+   ("Atenciosamente," ou equivalente) SEM assinatura — nome e contato sao adicionados depois pelo
+   sistema, nunca escreva o nome do candidato na carta.
 
 Responda APENAS com um JSON no formato exato:
-{"sufficientMatch": true, "matchWarning": null, "headline": "...", "summary": "...", "selectedAchievements": [{"achievementId": "...", "bullet": "..."}], "keywords": ["..."], "interviewQuestions": [{"question": "...", "rationale": "..."}]}`
+{"sufficientMatch": true, "matchWarning": null, "headline": "...", "summary": "...", "coverLetter": "...", "selectedAchievements": [{"achievementId": "...", "bullet": "..."}], "keywords": ["..."], "interviewQuestions": [{"question": "...", "rationale": "..."}]}`
 }
 
 // Removes a comma or space sitting between two digits (thousands grouping,
@@ -94,9 +103,30 @@ function sortEducation(education: Education[]): Education[] {
   })
 }
 
+// The structured achievements have two guards (id exists, metric digits
+// survive translation) that make assembleGeneratedCv THROW on a suspected
+// fabrication. coverLetter is free prose referencing the same real
+// achievements but had none of that — a hallucinated number there would
+// silently reach a real recruiter with the same reputational risk as a bad
+// CV. Reuse the same digit-provenance idea: every whole-number token in the
+// letter must appear as a whole number somewhere in the real, already-
+// verified bullets/metrics it's allowed to draw from (not a byte-for-byte
+// match — the letter paraphrases freely, only the numbers are checked).
+function assertCoverLetterDigitsAreReal(coverLetter: string, realAchievements: { bullet: string; metric: string | null }[]): void {
+  const trustedText = normalizeNumberGrouping(
+    realAchievements.map((a) => `${a.bullet} ${a.metric ?? ''}`).join(' '),
+  )
+  const letterDigits = extractDigits(normalizeNumberGrouping(coverLetter))
+  const missingDigits = letterDigits.filter((digit) => !containsWholeNumber(trustedText, digit))
+  if (missingDigits.length > 0) {
+    throw new Error(`Numero na cover letter nao encontrado nas conquistas reais selecionadas (possivel alucinacao): ${missingDigits.join(', ')}.`)
+  }
+}
+
 export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvResponse, language: CvLanguage): GeneratedCv {
   const seenIds = new Set<string>()
   const selectedAchievements = []
+  const realSelected: { bullet: string; metric: string | null }[] = []
 
   for (const selected of model.selectedAchievements) {
     // A model quirk (not a fabrication signal) can select the same real
@@ -133,7 +163,10 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     }
 
     selectedAchievements.push({ company: real.company, roleTitle: real.role_title, bullet: selected.bullet })
+    realSelected.push({ bullet: real.bullet, metric: real.metric })
   }
+
+  assertCoverLetterDigitsAreReal(model.coverLetter, realSelected)
 
   return {
     sufficientMatch: model.sufficientMatch,
@@ -141,6 +174,7 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     language,
     headline: model.headline,
     summary: model.summary,
+    coverLetter: model.coverLetter,
     selectedAchievements,
     education: sortEducation(masterData.education).map((e) => ({
       institution: e.institution,

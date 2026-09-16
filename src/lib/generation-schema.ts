@@ -11,6 +11,10 @@ export const modelCvResponseSchema = z.object({
   matchWarning: z.string().nullable(),
   headline: z.string().min(1),
   summary: z.string().min(1),
+  // Prompted for 200-350 words (~2500 chars); cap at 3000 as a backstop
+  // against a degenerate/looping model response reaching storage and being
+  // rendered whole in the UI's <pre> block.
+  coverLetter: z.string().min(1).max(3000),
   selectedAchievements: z.array(z.object({
     achievementId: z.string().min(1),
     bullet: z.string().min(1),
@@ -50,6 +54,12 @@ export const generatedCvSchema = z.object({
   language: z.enum(['pt', 'en']).default('pt'),
   headline: z.string().min(1),
   summary: z.string().min(1),
+  // Same provenance story as summary/headline: not achievementId-verified
+  // prose, but built from a prompt constrained to the same real master data.
+  // Defaults to '' so a cv_versions row saved before this field existed
+  // parses without throwing (the applications detail page hides the cover
+  // letter section entirely when it's empty rather than showing a blank box).
+  coverLetter: z.string().max(3000).default(''),
   selectedAchievements: z.array(z.object({
     company: z.string().min(1),
     roleTitle: z.string().min(1),

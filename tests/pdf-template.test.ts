@@ -33,6 +33,7 @@ const content: GeneratedCv = {
   language: 'en',
   headline: 'Technical Program Manager',
   summary: 'Summary text for this role.',
+  coverLetter: 'Cover letter text for this role.',
   selectedAchievements: [
     { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Reduced Cost of Goods Sold by 5%, generating ~R$5MM/year in savings.' },
   ],

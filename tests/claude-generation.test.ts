@@ -41,6 +41,12 @@ describe('buildGenerationPrompt', () => {
     const promptPt = buildGenerationPrompt(masterData, 'Vaga qualquer', 'pt')
     expect(promptPt.toLowerCase()).toContain('português')
   })
+
+  it('instructs the model to write a coverLetter grounded only in real achievements, with a generic greeting/closing and no fabricated name', () => {
+    const prompt = buildGenerationPrompt(masterData, 'Vaga qualquer', 'pt')
+    expect(prompt).toContain('"coverLetter"')
+    expect(prompt.toLowerCase()).toContain('nunca escreva o nome do candidato')
+  })
 })
 
 describe('assembleGeneratedCv', () => {
@@ -50,6 +56,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       selectedAchievements: [{ achievementId: 'does-not-exist', bullet: 'Invented achievement' }],
       keywords: [],
       interviewQuestions: [],
@@ -63,6 +70,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       selectedAchievements: [{ achievementId: '1', bullet: 'Reduzimos o custo de mercadorias vendidas em 5%.' }],
       keywords: [],
       interviewQuestions: [],
@@ -83,6 +91,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       // Real metric is "5%" — this bullet says 50%, a hallucinated number.
       selectedAchievements: [{ achievementId: '1', bullet: 'Reduced costs by 50%.' }],
       keywords: [],
@@ -97,6 +106,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       // Real metric is "$1,000" — bullet drops the comma, same real number.
       selectedAchievements: [{ achievementId: '2', bullet: 'Saved $1000 in vendor costs.' }],
       keywords: [],
@@ -109,6 +119,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       // Real metric is "$1,000" — this is a different number, not a
       // reformat, so it must still be caught.
       selectedAchievements: [{ achievementId: '2', bullet: 'Saved $10000 in vendor costs.' }],
@@ -124,6 +135,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       selectedAchievements: [
         { achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' },
         { achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' },
@@ -143,6 +155,7 @@ describe('assembleGeneratedCv', () => {
       matchWarning: null,
       headline: 'H',
       summary: 'S',
+      coverLetter: 'CL',
       selectedAchievements: [],
       keywords: [],
       interviewQuestions: [],
@@ -151,10 +164,60 @@ describe('assembleGeneratedCv', () => {
     const result = assembleGeneratedCv(masterData, model, 'en')
 
     expect(result.language).toBe('en')
+    expect(result.coverLetter).toBe('CL')
     expect(result.education).toHaveLength(2)
     // In-progress entry sorts first regardless of completedOn.
     expect(result.education[0]).toEqual({ institution: 'FGV', degree: 'MBA', completedOn: null, inProgress: true })
     expect(result.education[1]).toEqual({ institution: 'UFRJ', degree: 'Engenharia', completedOn: '2010-12-01', inProgress: false })
+  })
+
+  it('does not throw when the coverLetter only references numbers that appear in the selected achievements\' real bullets/metrics', () => {
+    const model = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      coverLetter: 'Reduzi o CMV em 5%, e economizei $1,000 em custos de fornecedores.',
+      selectedAchievements: [
+        { achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' },
+        { achievementId: '2', bullet: 'Saved $1,000 in vendor costs.' },
+      ],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(masterData, model, 'pt')).not.toThrow()
+  })
+
+  it('throws when the coverLetter contains a number not present in any selected achievement\'s real bullet/metric (possible fabrication)', () => {
+    const model = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      // 87% never appears in the selected achievement (real metric is 5%) — a hallucinated number.
+      coverLetter: 'Reduzi custos em 87% ao longo do programa.',
+      selectedAchievements: [{ achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' }],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(masterData, model, 'pt')).toThrow(/alucina/)
+  })
+
+  it('does not throw when the coverLetter has no numbers at all', () => {
+    const model = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      coverLetter: 'Tenho grande interesse nessa posicao e acredito que minha experiencia agrega valor.',
+      selectedAchievements: [{ achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' }],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(masterData, model, 'pt')).not.toThrow()
   })
 })
 
@@ -165,6 +228,7 @@ describe('generateTailoredCv', () => {
       matchWarning: null,
       headline: 'Technical Program Manager',
       summary: 'Summary',
+      coverLetter: 'Cover letter text',
       selectedAchievements: [{ achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' }],
       keywords: ['SAP Business One'],
       interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
@@ -194,6 +258,7 @@ describe('generateTailoredCv', () => {
       matchWarning: null,
       headline: 'Technical Program Manager',
       summary: 'Summary',
+      coverLetter: 'Cover letter text',
       selectedAchievements: [{ achievementId: '1', bullet: 'Reduced Cost of Goods Sold by 5%.' }],
       keywords: ['SAP Business One'],
       interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
