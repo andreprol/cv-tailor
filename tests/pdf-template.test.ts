@@ -77,21 +77,21 @@ describe('renderCvPdf', () => {
     expect(numpages).toBeGreaterThan(1)
   })
 
-  it('uses Portuguese section headers when language is pt', async () => {
+  it('uses Portuguese section headers (uppercase, per the redesign) when language is pt', async () => {
     const ptBuffer = await renderCvPdf(profile, { ...content, language: 'pt' })
     const { text: ptText } = await parsePdfRetrying(ptBuffer)
-    expect(ptText).toContain('Resumo Profissional')
-    expect(ptText).toContain('Experiência Profissional')
-    expect(ptText).toContain('Formação Acadêmica')
-    expect(ptText).toContain('Competências')
+    expect(ptText).toContain('RESUMO PROFISSIONAL')
+    expect(ptText).toContain('EXPERIÊNCIA PROFISSIONAL')
+    expect(ptText).toContain('FORMAÇÃO ACADÊMICA')
+    expect(ptText).toContain('COMPETÊNCIAS')
   })
 
   it('uses English section headers when language is en', async () => {
     const enBuffer = await renderCvPdf(profile, { ...content, language: 'en' })
     const { text: enText } = await parsePdfRetrying(enBuffer)
-    expect(enText).toContain('Professional Summary')
-    expect(enText).toContain('Work Experience')
-    expect(enText).toContain('Education')
+    expect(enText).toContain('PROFESSIONAL SUMMARY')
+    expect(enText).toContain('WORK EXPERIENCE')
+    expect(enText).toContain('EDUCATION')
   })
 
   it('groups multiple achievements from the same real job under one heading, instead of repeating the role title per bullet', async () => {

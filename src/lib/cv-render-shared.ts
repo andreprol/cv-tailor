@@ -31,8 +31,3 @@ export function groupByRole(achievements: GeneratedCv['selectedAchievements']) {
 
   return groups
 }
-
-export function educationLine(entry: GeneratedCv['education'][number]): string {
-  const status = entry.inProgress ? 'Em andamento' : entry.completedOn
-  return [entry.degree, entry.institution, status].filter(Boolean).join(' — ')
-}
