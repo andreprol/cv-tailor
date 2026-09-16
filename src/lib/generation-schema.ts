@@ -34,9 +34,20 @@ export function parseModelCvResponse(raw: string): ModelCvResponse {
 // from the real master data record (see assembleGeneratedCv in
 // claude-generation.ts) — never trusted from the model's own JSON — so a
 // mismatched or hallucinated company name can never reach a rendered CV.
+// `language` and `education` are likewise never produced by the model: they
+// are attached by assembleGeneratedCv straight from the real request/master
+// data, and persisted here so the standalone PDF route (which only has the
+// saved generated_json, not the original request) can render them identically
+// to the docx generated at the same time.
+// Both default rather than being required: CVs generated before this field
+// existed already have rows in `cv_versions` without them, and the /pdf route
+// re-parses that stored JSON on every download — a hard requirement here
+// would turn "download the PDF for an old application" into a 500 for every
+// CV generated before this change shipped.
 export const generatedCvSchema = z.object({
   sufficientMatch: z.boolean(),
   matchWarning: z.string().nullable(),
+  language: z.enum(['pt', 'en']).default('pt'),
   headline: z.string().min(1),
   summary: z.string().min(1),
   selectedAchievements: z.array(z.object({
@@ -44,6 +55,18 @@ export const generatedCvSchema = z.object({
     roleTitle: z.string().min(1),
     bullet: z.string().min(1),
   })),
+  // Education is never selected/rewritten by the model — it's the user's
+  // full academic history, copied verbatim from the master data bank in
+  // assembleGeneratedCv. Sorted (in-progress first, then most recent
+  // completedOn) before being stored here. Defaults to empty for a CV
+  // generated before this field existed (honest: we have no snapshot of the
+  // user's education at that point in time, not an actual empty history).
+  education: z.array(z.object({
+    institution: z.string().min(1),
+    degree: z.string().min(1),
+    completedOn: z.string().nullable(),
+    inProgress: z.boolean(),
+  })).default([]),
   keywords: z.array(z.string().min(1)),
   interviewQuestions: z.array(z.object({
     question: z.string().min(1),

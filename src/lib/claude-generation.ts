@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { parseModelCvResponse, type GeneratedCv, type ModelCvResponse } from './generation-schema'
-import type { MasterDataBank } from './types'
+import type { Education, MasterDataBank } from './types'
 
 export type CvLanguage = 'pt' | 'en'
 
@@ -82,7 +82,19 @@ function containsWholeNumber(text: string, number: string): boolean {
   return new RegExp(`(?<!\\d)${number}(?!\\d)`).test(text)
 }
 
-export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvResponse): GeneratedCv {
+// In-progress education first (still current, most relevant), then completed
+// entries newest-first; entries without a completedOn (shouldn't normally
+// happen outside in-progress) sort last within their group.
+function sortEducation(education: Education[]): Education[] {
+  return [...education].sort((a, b) => {
+    if (a.in_progress !== b.in_progress) return a.in_progress ? -1 : 1
+    if (!a.completed_on) return 1
+    if (!b.completed_on) return -1
+    return b.completed_on.localeCompare(a.completed_on)
+  })
+}
+
+export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvResponse, language: CvLanguage): GeneratedCv {
   const seenIds = new Set<string>()
   const selectedAchievements = []
 
@@ -126,9 +138,16 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
   return {
     sufficientMatch: model.sufficientMatch,
     matchWarning: model.matchWarning,
+    language,
     headline: model.headline,
     summary: model.summary,
     selectedAchievements,
+    education: sortEducation(masterData.education).map((e) => ({
+      institution: e.institution,
+      degree: e.degree,
+      completedOn: e.completed_on,
+      inProgress: e.in_progress,
+    })),
     keywords: model.keywords,
     interviewQuestions: model.interviewQuestions,
   }
@@ -149,7 +168,7 @@ async function callOnce(client: Anthropic, masterData: MasterDataBank, jobDescri
     throw new Error(`Claude nao retornou nenhum bloco de texto (stop_reason: ${response.stop_reason}). Blocos recebidos: ${response.content.map((b) => b.type).join(', ')}`)
   }
   const model = parseModelCvResponse(textBlock.text)
-  return assembleGeneratedCv(masterData, model)
+  return assembleGeneratedCv(masterData, model, language)
 }
 
 export async function generateTailoredCv(client: Anthropic, masterData: MasterDataBank, jobDescription: string, language: CvLanguage): Promise<GeneratedCv> {

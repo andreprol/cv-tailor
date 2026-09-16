@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseModelCvResponse } from '../src/lib/generation-schema'
+import { parseModelCvResponse, generatedCvSchema } from '../src/lib/generation-schema'
 
 const validJson = JSON.stringify({
   sufficientMatch: true,
@@ -67,5 +67,22 @@ describe('parseModelCvResponse', () => {
     const fenced = '```json\n' + validJson + '\n```'
     const result = parseModelCvResponse(fenced)
     expect(result.headline).toBe('Technical Program Manager')
+  })
+})
+
+describe('generatedCvSchema', () => {
+  it('defaults language and education for a stored cv_versions row from before those fields existed, instead of throwing (the /pdf route re-parses this on every download)', () => {
+    const preExistingStoredRow = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'Technical Program Manager',
+      summary: 'Summary',
+      selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real' }],
+      keywords: ['SAP B1'],
+      interviewQuestions: [],
+    }
+    const result = generatedCvSchema.parse(preExistingStoredRow)
+    expect(result.language).toBe('pt')
+    expect(result.education).toEqual([])
   })
 })

@@ -8,7 +8,10 @@ const masterData: MasterDataBank = {
     { id: '2', user_id: '1', company: 'Acme Corp', role_title: 'TPM', start_date: '2020-01-01', end_date: null, bullet: 'Saved $1,000 in vendor costs.', metric: '$1,000', positioning: ['TPM'] },
   ],
   skills: [{ id: '1', user_id: '1', name: 'SAP Business One', category: 'ERP', positioning: ['TPM'] }],
-  education: [],
+  education: [
+    { id: 'e1', user_id: '1', institution: 'UFRJ', degree: 'Engenharia', completed_on: '2010-12-01', in_progress: false, positioning: ['TPM'] },
+    { id: 'e2', user_id: '1', institution: 'FGV', degree: 'MBA', completed_on: null, in_progress: true, positioning: ['TPM'] },
+  ],
   certifications: [],
 }
 
@@ -51,7 +54,7 @@ describe('assembleGeneratedCv', () => {
       keywords: [],
       interviewQuestions: [],
     } as any
-    expect(() => assembleGeneratedCv(masterData, model)).toThrow(/alucina/)
+    expect(() => assembleGeneratedCv(masterData, model, 'pt')).toThrow(/alucina/)
   })
 
   it('does not throw when achievementId is real, and sources company/roleTitle from the real master data record (not from the model output)', () => {
@@ -66,7 +69,7 @@ describe('assembleGeneratedCv', () => {
     } as any
 
     let result: ReturnType<typeof assembleGeneratedCv>
-    expect(() => { result = assembleGeneratedCv(masterData, model) }).not.toThrow()
+    expect(() => { result = assembleGeneratedCv(masterData, model, 'pt') }).not.toThrow()
 
     expect(result!.selectedAchievements).toHaveLength(1)
     expect(result!.selectedAchievements[0].company).toBe('Delirio Tropical')
@@ -85,7 +88,7 @@ describe('assembleGeneratedCv', () => {
       keywords: [],
       interviewQuestions: [],
     } as any
-    expect(() => assembleGeneratedCv(masterData, model)).toThrow(/alucina/)
+    expect(() => assembleGeneratedCv(masterData, model, 'pt')).toThrow(/alucina/)
   })
 
   it('does not false-positive when a thousands separator is added or removed during translation', () => {
@@ -99,7 +102,7 @@ describe('assembleGeneratedCv', () => {
       keywords: [],
       interviewQuestions: [],
     } as any
-    expect(() => assembleGeneratedCv(masterData, withoutComma)).not.toThrow()
+    expect(() => assembleGeneratedCv(masterData, withoutComma, 'pt')).not.toThrow()
 
     const genuinelyAltered = {
       sufficientMatch: true,
@@ -112,7 +115,7 @@ describe('assembleGeneratedCv', () => {
       keywords: [],
       interviewQuestions: [],
     } as any
-    expect(() => assembleGeneratedCv(masterData, genuinelyAltered)).toThrow(/alucina/)
+    expect(() => assembleGeneratedCv(masterData, genuinelyAltered, 'pt')).toThrow(/alucina/)
   })
 
   it('deduplicates a repeated achievementId instead of rendering the same achievement twice', () => {
@@ -129,9 +132,29 @@ describe('assembleGeneratedCv', () => {
       interviewQuestions: [],
     } as any
 
-    const result = assembleGeneratedCv(masterData, model)
+    const result = assembleGeneratedCv(masterData, model, 'pt')
 
     expect(result.selectedAchievements).toHaveLength(1)
+  })
+
+  it('carries the requested language through untouched, and copies the full education list from master data (never filtered/rewritten by the model)', () => {
+    const model = {
+      sufficientMatch: true,
+      matchWarning: null,
+      headline: 'H',
+      summary: 'S',
+      selectedAchievements: [],
+      keywords: [],
+      interviewQuestions: [],
+    } as any
+
+    const result = assembleGeneratedCv(masterData, model, 'en')
+
+    expect(result.language).toBe('en')
+    expect(result.education).toHaveLength(2)
+    // In-progress entry sorts first regardless of completedOn.
+    expect(result.education[0]).toEqual({ institution: 'FGV', degree: 'MBA', completedOn: null, inProgress: true })
+    expect(result.education[1]).toEqual({ institution: 'UFRJ', degree: 'Engenharia', completedOn: '2010-12-01', inProgress: false })
   })
 })
 

@@ -9,7 +9,7 @@ function makeDeps(overrides: Partial<GenerateCvDeps> = {}): GenerateCvDeps {
     }),
     getProfile: vi.fn().mockResolvedValue({ full_name: 'André Prol' }),
     generateTailoredCv: vi.fn().mockImplementation((_masterData, _jobDescription, _language) => Promise.resolve({
-      sufficientMatch: true, matchWarning: null,
+      sufficientMatch: true, matchWarning: null, language: 'pt', education: [],
       headline: 'TPM', summary: 'S', selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real' }], keywords: [], interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
     })),
     renderCvDocx: vi.fn().mockResolvedValue(Buffer.from('docx-bytes')),
@@ -51,7 +51,7 @@ describe('runCvGeneration', () => {
   it('generates the CV anyway when Claude finds no relevant achievements, backfilling a matchWarning', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
-        sufficientMatch: false, matchWarning: null,
+        sufficientMatch: false, matchWarning: null, language: 'pt', education: [],
         headline: 'X', summary: 'Y', selectedAchievements: [], keywords: [], interviewQuestions: [],
       }),
     })
@@ -69,7 +69,7 @@ describe('runCvGeneration', () => {
   it('backfills a matchWarning when sufficientMatch is false and the model forgot to explain why, even with some achievements selected', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
-        sufficientMatch: false, matchWarning: null,
+        sufficientMatch: false, matchWarning: null, language: 'pt', education: [],
         headline: 'X', summary: 'Y',
         selectedAchievements: [{ company: 'Acme', roleTitle: 'Role', bullet: 'Did something real' }],
         keywords: [], interviewQuestions: [],
@@ -89,7 +89,7 @@ describe('runCvGeneration', () => {
   it('generates the CV anyway when sufficientMatch is false, preserving the model\'s own matchWarning untouched (real case: a Web3 posting against a TPM-only bank got 3 real, verbatim, but topically irrelevant achievements selected — the app must not decide for the user whether the vaga is worth applying to)', async () => {
     const deps = makeDeps({
       generateTailoredCv: vi.fn().mockResolvedValue({
-        sufficientMatch: false,
+        sufficientMatch: false, language: 'pt', education: [],
         matchWarning: 'Banco de dados nao tem experiencia real em Rust/Solidity/Soroban, exigidos pela vaga.',
         headline: 'Soroban Smart Contract Developer',
         summary: 'Some summary the model still filled in',

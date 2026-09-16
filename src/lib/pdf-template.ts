@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit'
 import type { Profile } from './types'
 import type { GeneratedCv } from './generation-schema'
+import { SECTION_LABELS, groupByRole, educationLine } from './cv-render-shared'
 
 export function sanitizeFilename(name: string): string {
   const transliterated = name.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -9,6 +10,7 @@ export function sanitizeFilename(name: string): string {
 }
 
 export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promise<Buffer> {
+  const labels = SECTION_LABELS[content.language]
   const doc = new PDFDocument({ margin: 50, size: 'A4' })
   const chunks: Buffer[] = []
   doc.on('data', (chunk: Buffer) => chunks.push(chunk))
@@ -23,22 +25,30 @@ export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promi
 
   doc.font('Helvetica-Bold').fontSize(20).text(profile.full_name)
   doc.font('Helvetica').fontSize(12).text(content.headline)
-  doc.fontSize(10).text(contactLine)
+  doc.fontSize(11).text(contactLine)
   doc.moveDown()
 
-  doc.font('Helvetica-Bold').fontSize(13).text('Professional Summary')
-  doc.font('Helvetica').fontSize(10).text(content.summary)
+  doc.font('Helvetica-Bold').fontSize(13).text(labels.summary)
+  doc.font('Helvetica').fontSize(11).text(content.summary, { align: 'justify' })
   doc.moveDown()
 
-  doc.font('Helvetica-Bold').fontSize(13).text('Work Experience')
-  for (const achievement of content.selectedAchievements) {
-    doc.font('Helvetica-Bold').fontSize(10).text(`${achievement.roleTitle} - ${achievement.company}`)
-    doc.font('Helvetica').fontSize(10).text(`- ${achievement.bullet}`)
+  doc.font('Helvetica-Bold').fontSize(13).text(labels.experience)
+  for (const group of groupByRole(content.selectedAchievements)) {
+    doc.font('Helvetica-Bold').fontSize(11).text(`${group.roleTitle} - ${group.company}`)
+    for (const bullet of group.bullets) {
+      doc.font('Helvetica').fontSize(11).text(`- ${bullet}`, { align: 'justify' })
+    }
   }
   doc.moveDown()
 
-  doc.font('Helvetica-Bold').fontSize(13).text('Skills')
-  doc.font('Helvetica').fontSize(10).text(content.keywords.join(', '))
+  doc.font('Helvetica-Bold').fontSize(13).text(labels.education)
+  for (const entry of content.education) {
+    doc.font('Helvetica').fontSize(11).text(educationLine(entry))
+  }
+  doc.moveDown()
+
+  doc.font('Helvetica-Bold').fontSize(13).text(labels.skills)
+  doc.font('Helvetica').fontSize(11).text(content.keywords.join(', '))
 
   doc.end()
   return done
