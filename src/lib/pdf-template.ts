@@ -83,7 +83,7 @@ export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promi
   if (content.personalProjects.length > 0) {
     sectionHeading(doc, labels.projects)
     for (const project of content.personalProjects) {
-      doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(project.name, { continued: true })
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(project.name, { continued: true, align: 'justify' })
       doc.font('Helvetica').text(` — ${project.summary}`, { align: 'justify' })
     }
     doc.moveDown(0.2)
@@ -92,7 +92,7 @@ export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promi
   sectionHeading(doc, labels.education)
   for (const entry of content.education) {
     const status = formatEducationStatus(entry, content.language)
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(entry.degree, { continued: true })
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(entry.degree, { continued: true, align: 'justify' })
     doc.font('Helvetica').fillColor(MUTED_COLOR).text(` — ${entry.institution}${status ? ` — ${status}` : ''}`, { align: 'justify' })
   }
   doc.fillColor(BLACK)

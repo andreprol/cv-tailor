@@ -32,6 +32,16 @@ export function escapeRawControlChars(text: string): string {
 
   for (const char of text) {
     if (afterBackslash) {
+      // A backslash followed by a REAL newline is a line continuation the
+      // model wrote by hand. Copying it through leaves `\` + raw control
+      // char, which JSON.parse rejects with "Bad escaped character" — the
+      // very failure this function exists to prevent, just one byte over.
+      // Emit the escape and drop the pending backslash.
+      if (char < ' ') {
+        result = result.slice(0, -1) + (ESCAPES[char] ?? `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`)
+        afterBackslash = false
+        continue
+      }
       result += char
       afterBackslash = false
       continue

@@ -47,6 +47,14 @@ describe('escapeRawControlChars', () => {
     expect(JSON.parse(escapeRawControlChars(raw))).toEqual({ a: 'caminho\\', b: 1 })
   })
 
+  it('repairs a backslash line continuation, not just a bare raw newline', () => {
+    // `\` + real newline is what a model writes when it wraps a long string
+    // by hand. Left alone it fails with "Bad escaped character".
+    const raw = '{"a": "linha\\\ncontinua"}'
+    expect(() => JSON.parse(raw)).toThrow()
+    expect(JSON.parse(escapeRawControlChars(raw)).a).toBe('linha\ncontinua')
+  })
+
   it('escapes tabs and carriage returns too', () => {
     expect(JSON.parse(escapeRawControlChars('{"a": "x\ty\r\nz"}')).a).toBe('x\ty\r\nz')
   })

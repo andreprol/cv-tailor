@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { parseModelCvResponse, type GeneratedCv, type ModelCvResponse } from './generation-schema'
 import { PERSONAL_PROJECT_COMPANY, type Achievement, type Education, type MasterDataBank } from './types'
+import { findUnsupportedNumbers } from './number-provenance'
 import {
   groupRoles,
   isSameRealJob,
@@ -101,58 +102,6 @@ Responda APENAS com um JSON no formato exato:
 {"sufficientMatch": true, "matchWarning": null, "headline": "...", "summary": "...", "coverLetter": "...", "selectedAchievements": [{"achievementId": "...", "bullet": "..."}], "keywords": ["..."], "interviewQuestions": [{"question": "...", "rationale": "..."}]}`
 }
 
-// Removes a comma or space sitting between two digits (thousands grouping,
-// e.g. "1,000" -> "1000"), so a faithful reformat during translation doesn't
-// look like an altered number. Deliberately leaves periods alone — those are
-// ambiguous between a decimal point ("2.5%") and end-of-sentence punctuation,
-// and mishandling that would be worse than not normalizing periods at all.
-function normalizeNumberGrouping(text: string): string {
-  return text.replace(/(\d)[,\s](?=\d)/g, '$1')
-}
-
-const SCALE_WORDS: Record<string, number> = {
-  mil: 1_000, thousand: 1_000, k: 1_000,
-  milhao: 1_000_000, milhoes: 1_000_000, million: 1_000_000, millions: 1_000_000, mm: 1_000_000,
-  bilhao: 1_000_000_000, bilhoes: 1_000_000_000, billion: 1_000_000_000, bn: 1_000_000_000,
-}
-
-// "US$200 mil" and "$200,000" are the same real number written for two
-// different audiences, but digit-for-digit they share nothing — so the
-// anti-hallucination guards read an honest translation as a fabricated
-// number and aborted the whole generation with "possivel alucinacao".
-// Confirmed against the real API: an English CV built from a Portuguese bank
-// hit this on the very first try.
-//
-// The scale word CONSUMES the number it follows, so both spellings collapse
-// to the same canonical value: "US$200 mil" and "$200,000" both become
-// 200000. Appending the expansion instead of replacing it would not work —
-// the bare "200" would still be demanded of the translated text, which no
-// longer contains it as a standalone number.
-function expandScaleWords(text: string): string {
-  return text.replace(/(\d+)\s*(mil|milh[õo]es|milh[ãa]o|thousand|millions?|bilh[õo]es|bilh[ãa]o|billion|mm|bn|k)\b/gi, (match, digits: string, word: string) => {
-    const factor = SCALE_WORDS[word.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')]
-    return factor ? String(Number(digits) * factor) : match
-  })
-}
-
-// Both sides of every numeric comparison go through this, so the check is
-// about the VALUE, not about how either side chose to spell it.
-function normalizeNumbersForComparison(text: string): string {
-  return normalizeNumberGrouping(expandScaleWords(text))
-}
-
-function extractDigits(text: string): string[] {
-  return text.match(/\d+/g) ?? []
-}
-
-// A plain substring check would let "5%" pass against a bullet containing
-// "50%" (since "5" is literally a substring of "50") — exactly the kind of
-// altered number this guard exists to catch. Require the number to appear as
-// a whole token (not embedded inside a longer digit run) instead.
-function containsWholeNumber(text: string, number: string): boolean {
-  return new RegExp(`(?<!\\d)${number}(?!\\d)`).test(text)
-}
-
 // In-progress education first (still current, most relevant), then completed
 // entries newest-first; entries without a completedOn (shouldn't normally
 // happen outside in-progress) sort last within their group.
@@ -170,18 +119,16 @@ function sortEducation(education: Education[]): Education[] {
 // fabrication. coverLetter is free prose referencing the same real
 // achievements but had none of that — a hallucinated number there would
 // silently reach a real recruiter with the same reputational risk as a bad
-// CV. Reuse the same digit-provenance idea: every whole-number token in the
-// letter must appear as a whole number somewhere in the real, already-
-// verified bullets/metrics it's allowed to draw from (not a byte-for-byte
-// match — the letter paraphrases freely, only the numbers are checked).
-function assertCoverLetterDigitsAreReal(coverLetter: string, realAchievements: { bullet: string; metric: string | null }[]): void {
-  const trustedText = normalizeNumbersForComparison(
-    realAchievements.map((a) => `${a.bullet} ${a.metric ?? ''}`).join(' '),
-  )
-  const letterDigits = extractDigits(normalizeNumbersForComparison(coverLetter))
-  const missingDigits = letterDigits.filter((digit) => !containsWholeNumber(trustedText, digit))
-  if (missingDigits.length > 0) {
-    throw new Error(`Numero na cover letter nao encontrado nas conquistas reais selecionadas (possivel alucinacao): ${missingDigits.join(', ')}.`)
+// CV. Reuse the same provenance idea: every number in the letter must be a
+// real number from the already-verified bullets/metrics it is allowed to draw
+// from (not a byte-for-byte match — the letter paraphrases freely, only the
+// numbers are checked). See number-provenance.ts for how "same number" is
+// decided across translation and reformatting.
+function assertCoverLetterNumbersAreReal(coverLetter: string, realAchievements: { bullet: string; metric: string | null }[]): void {
+  const trustedText = realAchievements.map((a) => `${a.bullet} ${a.metric ?? ''}`).join(' ')
+  const unsupported = findUnsupportedNumbers(coverLetter, trustedText)
+  if (unsupported.length > 0) {
+    throw new Error(`Numero na cover letter nao encontrado nas conquistas reais selecionadas (possivel alucinacao): ${unsupported.join(', ')}.`)
   }
 }
 
@@ -252,15 +199,13 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     // bullet's WORDING is still fully trusted to the model — nothing else
     // checks that a number/percentage survived translation unchanged. Since
     // `metric` already stores the achievement's key number separately,
-    // cross-check its digits actually appear in the translated bullet
-    // (tolerant of reformatting like "30%" -> "30 percent", but catches an
-    // altered number like "50%").
+    // cross-check those numbers survive into the translated bullet (tolerant
+    // of reformatting like "30%" -> "30 percent" or "US$200 mil" ->
+    // "$200,000", but catching an altered number like "50%").
     if (real.metric) {
-      const normalizedMetric = normalizeNumbersForComparison(real.metric)
-      const normalizedBullet = normalizeNumbersForComparison(selected.bullet)
-      const missingDigits = extractDigits(normalizedMetric).filter((digit) => !containsWholeNumber(normalizedBullet, digit))
-      if (missingDigits.length > 0) {
-        throw new Error(`Numero/metrica alterado na traducao (possivel alucinacao): conquista "${real.bullet}" tem metrica real "${real.metric}", mas o bullet gerado nao contem ${missingDigits.join(', ')}.`)
+      const missing = findUnsupportedNumbers(real.metric, selected.bullet)
+      if (missing.length > 0) {
+        throw new Error(`Numero/metrica alterado na traducao (possivel alucinacao): conquista "${real.bullet}" tem metrica real "${real.metric}", mas o bullet gerado nao contem ${missing.join(', ')}.`)
       }
     }
 
@@ -276,7 +221,7 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     realSelected.push({ bullet: real.bullet, metric: real.metric })
   }
 
-  assertCoverLetterDigitsAreReal(model.coverLetter, realSelected)
+  assertCoverLetterNumbersAreReal(model.coverLetter, realSelected)
 
   // Only what the model actually chose can become the detailed section. A
   // group rebuilt by the coverage guarantee holds every raw bullet that

@@ -101,6 +101,29 @@ describe('selectSpokenLanguages', () => {
   it('returns empty when the bank has no spoken-language category at all', () => {
     expect(selectSpokenLanguages([{ name: 'Go', category: 'Languages' }], 'pt')).toEqual([])
   })
+
+  it('recognizes category spellings beyond the obvious one, instead of dropping the section', () => {
+    const spellings = [
+      { name: 'Inglês fluente', category: 'Idiomas Falados' },
+      { name: 'Espanhol básico', category: 'Línguas Faladas' },
+      { name: 'Alemão', category: 'Fluência' },
+    ]
+    expect(selectSpokenLanguages(spellings, 'pt')).toHaveLength(3)
+
+    expect(selectSpokenLanguages([{ name: 'English', category: 'Spoken  Languages' }], 'en')).toEqual(['English'])
+    expect(selectSpokenLanguages([{ name: 'English', category: 'Languages (Spoken)' }], 'en')).toEqual(['English'])
+  })
+
+  it('still refuses every programming-language category spelling', () => {
+    const programming = [
+      { name: 'Go', category: 'Languages' },
+      { name: 'Python', category: 'Linguagem de Programação' },
+      { name: 'Rust', category: 'Linguagens' },
+      { name: 'React', category: 'Tech Stack' },
+    ]
+    expect(selectSpokenLanguages(programming, 'pt')).toEqual([])
+    expect(selectSpokenLanguages(programming, 'en')).toEqual([])
+  })
 })
 
 describe('normalizeCompany', () => {

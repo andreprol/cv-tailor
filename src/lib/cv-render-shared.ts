@@ -83,19 +83,38 @@ export function formatEducationStatus(entry: GeneratedCv['education'][number], l
 }
 
 function normalizeCategory(category: string): string {
-  return category.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+  return category
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 // Spoken-language fluency lives in the skills table under its own category,
 // stored twice like the rest of the bank: a Portuguese-labelled one and an
 // English-labelled one.
 //
-// 'languages' is deliberately NOT in either list. In this data it is the
-// category holding PROGRAMMING languages (Node.js, Go, TypeScript, C#), so
-// matching it would print the tech stack under the CV's Languages heading.
-const SPOKEN_LANGUAGE_CATEGORIES: Record<RenderLanguage, string[]> = {
-  pt: ['idiomas', 'idioma', 'linguas'],
-  en: ['spoken languages', 'spoken language'],
+// Matched by predicate rather than by an exact list: a closed list of five
+// strings means "Idiomas Falados", "Línguas Faladas" or "Languages (Spoken)"
+// miss and the section disappears with no warning — the same silent loss the
+// feature exists to fix.
+//
+// A bare "languages"/"linguagens" is deliberately NOT enough. In this data
+// that is the category holding PROGRAMMING languages (Node.js, Go,
+// TypeScript, C#), so accepting it would print the tech stack under the CV's
+// Languages heading. Spoken-language categories must say so — "idioma",
+// "spoken", "fluência", or "língua" qualified as spoken.
+const PROGRAMMING_MARKERS = /\b(programa\w*|programming|code|codigo|stack|tech\w*|dev\w*)\b/
+const SPOKEN_LANGUAGE_MARKERS: Record<RenderLanguage, RegExp> = {
+  pt: /\bidiomas?\b|\bfluencia\b|\bl[ií]nguas?\s+(faladas?|estrangeiras?)\b/,
+  en: /\bspoken\b|\bfluency\b|\bforeign\s+languages?\b/,
+}
+
+function isSpokenLanguageCategory(category: string, language: RenderLanguage): boolean {
+  const normalized = normalizeCategory(category)
+  if (PROGRAMMING_MARKERS.test(normalized)) return false
+  return SPOKEN_LANGUAGE_MARKERS[language].test(normalized)
 }
 
 // Copied verbatim from the master data and never routed through the model.
@@ -104,14 +123,21 @@ const SPOKEN_LANGUAGE_CATEGORIES: Record<RenderLanguage, string[]> = {
 // rarely list "Portuguese — Native", so the line silently vanished from every
 // generated CV.
 export function selectSpokenLanguages(skills: Pick<Skill, 'name' | 'category'>[], language: RenderLanguage): string[] {
-  const named = (categories: string[]) =>
-    skills.filter((skill) => categories.includes(normalizeCategory(skill.category))).map((skill) => skill.name)
+  const named = (wanted: RenderLanguage) =>
+    skills.filter((skill) => isSpokenLanguageCategory(skill.category, wanted)).map((skill) => skill.name)
 
-  const preferred = named(SPOKEN_LANGUAGE_CATEGORIES[language])
+  const preferred = named(language)
   if (preferred.length > 0) return preferred
+
   // Better a fluency line written in the other language than no fluency line
   // at all — a bank that only has one of the two variants is normal.
-  return named(SPOKEN_LANGUAGE_CATEGORIES[language === 'pt' ? 'en' : 'pt'])
+  const fallback = named(language === 'pt' ? 'en' : 'pt')
+  if (fallback.length === 0 && skills.length > 0) {
+    // Says so instead of dropping the section silently: the likeliest cause
+    // is a category spelled in a way neither marker recognizes.
+    console.warn('selectSpokenLanguages: nenhuma categoria de idioma falado reconhecida no banco mestre; secao de idiomas sera omitida.')
+  }
+  return fallback
 }
 
 // Only a TRAILING legal suffix is stripped, and only as a whole word, so
