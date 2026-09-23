@@ -126,7 +126,7 @@ function sortEducation(education: Education[]): Education[] {
 // decided across translation and reformatting.
 function assertCoverLetterNumbersAreReal(coverLetter: string, realAchievements: { bullet: string; metric: string | null }[]): void {
   const trustedText = realAchievements.map((a) => `${a.bullet} ${a.metric ?? ''}`).join(' ')
-  const unsupported = findUnsupportedNumbers(coverLetter, trustedText)
+  const unsupported = findUnsupportedNumbers(coverLetter, trustedText, { onlyMarked: true })
   if (unsupported.length > 0) {
     throw new Error(`Numero na cover letter nao encontrado nas conquistas reais selecionadas (possivel alucinacao): ${unsupported.join(', ')}.`)
   }
@@ -202,6 +202,27 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     // cross-check those numbers survive into the translated bullet (tolerant
     // of reformatting like "30%" -> "30 percent" or "US$200 mil" ->
     // "$200,000", but catching an altered number like "50%").
+    // Two directions, and both matter:
+    //
+    //   metric -> bullet  catches a real number being dropped or altered in
+    //                     translation ("5%" becoming "50%").
+    //   bullet -> source  catches a number being INVENTED. Only the first
+    //                     direction existed, so a bullet could carry
+    //                     "99.9% uptime across 450 stores" with neither
+    //                     figure anywhere in the master data and pass — and
+    //                     an achievement with no `metric` at all was not
+    //                     checked in any way.
+    //
+    // Unlike the cover letter, this one checks every number rather than only
+    // the metric-marked ones: a CV bullet is a translation of one specific
+    // master bullet, so a number that is not in the source has no business
+    // being there, whereas a cover letter is prose that legitimately says
+    // "since 2014" or "10 years".
+    const invented = findUnsupportedNumbers(selected.bullet, `${real.bullet} ${real.metric ?? ''}`)
+    if (invented.length > 0) {
+      throw new Error(`Numero inventado no bullet gerado (possivel alucinacao): conquista real "${real.bullet}" nao contem ${invented.join(', ')}.`)
+    }
+
     if (real.metric) {
       const missing = findUnsupportedNumbers(real.metric, selected.bullet)
       if (missing.length > 0) {

@@ -42,7 +42,7 @@ export async function runCvGeneration(deps: GenerateCvDeps, applicationId: strin
   // chegar na parte humana. Se a IA julgou o match insuficiente (sufficientMatch: false) e também
   // não preencheu matchWarning sozinha — mesmo tendo selecionado algumas conquistas soltas —
   // garante que sempre existe um aviso pra mostrar na tela (nunca no documento em si — nem
-  // docx-template.ts nem pdf-template.ts leem esse campo).
+  // docx-template.ts nao le esse campo).
   if (!generated.sufficientMatch && !generated.matchWarning) {
     generated.matchWarning = 'Nenhuma conquista do banco combina diretamente com essa vaga — CV gerado só com resumo/skills.'
   }

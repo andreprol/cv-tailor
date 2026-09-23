@@ -14,6 +14,11 @@ describe('stripMarkdownFence', () => {
     expect(stripMarkdownFence('```\n{"a": 1}\n```')).toBe('{"a": 1}')
   })
 
+  it('keeps a triple backtick that is part of the JSON string, instead of cutting the answer there', () => {
+    const raw = '```json\n{"a": "use ```bash ls``` no terminal"}\n```'
+    expect(JSON.parse(stripMarkdownFence(raw)).a).toBe('use ```bash ls``` no terminal')
+  })
+
   it('strips an opening fence with no closing one, which is what a truncated response looks like', () => {
     expect(stripMarkdownFence('```json\n{"a": 1')).toBe('{"a": 1')
   })

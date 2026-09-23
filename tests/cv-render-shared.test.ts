@@ -114,12 +114,20 @@ describe('selectSpokenLanguages', () => {
     expect(selectSpokenLanguages([{ name: 'English', category: 'Languages (Spoken)' }], 'en')).toEqual(['English'])
   })
 
+  it('accepts the common CV wording for a proficiency section', () => {
+    expect(selectSpokenLanguages([{ name: 'English', category: 'Language Proficiency' }], 'en')).toEqual(['English'])
+    expect(selectSpokenLanguages([{ name: 'Inglês', category: 'Línguas' }], 'pt')).toEqual(['Inglês'])
+  })
+
   it('still refuses every programming-language category spelling', () => {
     const programming = [
       { name: 'Go', category: 'Languages' },
       { name: 'Python', category: 'Linguagem de Programação' },
       { name: 'Rust', category: 'Linguagens' },
       { name: 'React', category: 'Tech Stack' },
+      // The bare "fluency" marker used to match this and put the stack under
+      // the CV's Languages heading.
+      { name: 'Python', category: 'Fluência em Python' },
     ]
     expect(selectSpokenLanguages(programming, 'pt')).toEqual([])
     expect(selectSpokenLanguages(programming, 'en')).toEqual([])

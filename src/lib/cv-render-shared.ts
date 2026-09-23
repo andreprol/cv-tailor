@@ -1,9 +1,7 @@
 import type { GeneratedCv } from './generation-schema'
 import type { Skill } from './types'
 
-// Shared between docx-template.ts and pdf-template.ts so a future change to
-// labels, grouping, date formatting or the education line only needs to
-// happen once.
+// Shared rendering vocabulary for docx-template.ts.
 export const SECTION_LABELS = {
   pt: {
     summary: 'Resumo Profissional',
@@ -106,9 +104,14 @@ function normalizeCategory(category: string): string {
 // Languages heading. Spoken-language categories must say so — "idioma",
 // "spoken", "fluência", or "língua" qualified as spoken.
 const PROGRAMMING_MARKERS = /\b(programa\w*|programming|code|codigo|stack|tech\w*|dev\w*)\b/
+
+// "fluência"/"fluency" is only a spoken-language marker on its own or when
+// qualified. Bare, it matched "Fluência em Python" and put the tech stack
+// under the CV's Languages heading. Accents are already folded away by
+// normalizeCategory, so these patterns are written unaccented.
 const SPOKEN_LANGUAGE_MARKERS: Record<RenderLanguage, RegExp> = {
-  pt: /\bidiomas?\b|\bfluencia\b|\bl[ií]nguas?\s+(faladas?|estrangeiras?)\b/,
-  en: /\bspoken\b|\bfluency\b|\bforeign\s+languages?\b/,
+  pt: /\bidiomas?\b|\blinguas?\b|^fluencia$|\bfluencia\s+(?:em\s+)?(?:idiomas?|linguas?)\b|\b(?:idiomas?|linguas?)\s+(?:proficiencia|nivel)\b/,
+  en: /\bspoken\b|\bforeign\s+languages?\b|^fluency$|\blanguages?\s+(?:proficiency|level|skills)\b|\bproficiency\s+in\s+languages?\b/,
 }
 
 function isSpokenLanguageCategory(category: string, language: RenderLanguage): boolean {

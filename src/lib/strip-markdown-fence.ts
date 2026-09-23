@@ -1,8 +1,11 @@
 // claude-sonnet-5 sometimes wraps a JSON answer in a ```json ... ``` fence even
 // when explicitly told to respond with only the JSON. Strip it before parsing.
 export function stripMarkdownFence(text: string): string {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
-  if (fenced) return fenced[1]
+  // Greedy, anchored at the LAST closing fence: a lazy match stopped at the
+  // first one, so a triple backtick inside a JSON string ("use ```bash…```")
+  // cut the answer in half and the parse died on an unterminated string.
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*)```/)
+  if (fenced) return fenced[1].trim()
   // A truncated response (max_tokens reached mid-answer) has the OPENING
   // fence but no closing one, so the match above fails and the raw text goes
   // to JSON.parse, which reports a baffling "Unexpected token '`'" instead of

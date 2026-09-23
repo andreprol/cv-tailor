@@ -73,7 +73,6 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             <span>Currículo pronto, ATS-safe, sob medida pra essa vaga.</span>
             <div style={{ display: 'flex', gap: 8 }}>
               <a href={downloadUrl} className="btn btn-primary">⬇ Baixar .docx</a>
-              <a href={`/applications/${application.id}/pdf`} className="btn btn-secondary">⬇ Baixar PDF</a>
             </div>
           </div>
 

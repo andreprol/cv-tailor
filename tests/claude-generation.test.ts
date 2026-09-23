@@ -167,6 +167,39 @@ describe('assembleGeneratedCv', () => {
     expect(() => assembleGeneratedCv(scaled, model, 'en')).toThrow(/alucina/)
   })
 
+  it('catches a number invented in the generated bullet, even when the achievement has no metric at all', () => {
+    const withoutMetric: MasterDataBank = {
+      ...masterData,
+      achievements: [
+        { id: 'n1', user_id: '1', company: 'Delirio Tropical', role_title: 'IT Manager', start_date: '2014-10-01', end_date: null, bullet: 'Gerenciei a infraestrutura de TI da rede.', metric: null, positioning: ['TPM'] },
+      ],
+    }
+    const model = {
+      sufficientMatch: true, matchWarning: null, headline: 'H', summary: 'S', coverLetter: 'CL',
+      // Nothing in the real achievement mentions 450 stores or 99.9% uptime.
+      selectedAchievements: [{ achievementId: 'n1', bullet: 'Managed IT infrastructure across 450 stores with 99.9% uptime.' }],
+      keywords: [], interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(withoutMetric, model, 'en')).toThrow(/alucina/)
+  })
+
+  it('does not flag numbers that are in the real achievement but outside its metric field', () => {
+    const richBullet: MasterDataBank = {
+      ...masterData,
+      achievements: [
+        { id: 'n2', user_id: '1', company: 'Delirio Tropical', role_title: 'IT Manager', start_date: '2014-10-01', end_date: null, bullet: 'Eliminei o reporte manual em 224 endpoints de 10 unidades.', metric: '224', positioning: ['TPM'] },
+      ],
+    }
+    const model = {
+      sufficientMatch: true, matchWarning: null, headline: 'H', summary: 'S', coverLetter: 'CL',
+      selectedAchievements: [{ achievementId: 'n2', bullet: 'Eliminated manual reporting across 224 endpoints in 10 sites.' }],
+      keywords: [], interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(richBullet, model, 'en')).not.toThrow()
+  })
+
   it('deduplicates a repeated achievementId instead of rendering the same achievement twice', () => {
     const model = {
       sufficientMatch: true,
