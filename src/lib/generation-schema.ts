@@ -60,11 +60,37 @@ export const generatedCvSchema = z.object({
   // parses without throwing (the applications detail page hides the cover
   // letter section entirely when it's empty rather than showing a blank box).
   coverLetter: z.string().max(3000).default(''),
+  // startDate/endDate are copied straight from the real master data row the
+  // model cited by id — the model never supplies a date, exactly as it never
+  // supplies company/roleTitle. They are nullable-with-default because rows
+  // in `cv_versions` written before dates existed have none: those keep
+  // rendering without a period line instead of turning every old download
+  // into a 500.
   selectedAchievements: z.array(z.object({
     company: z.string().min(1),
     roleTitle: z.string().min(1),
+    startDate: z.string().nullable().default(null),
+    endDate: z.string().nullable().default(null),
     bullet: z.string().min(1),
   })),
+  // Every job that isn't the current one, condensed to a single line. Built
+  // deterministically in assembleGeneratedCv from the real master data — the
+  // model influences which bullet is quoted (and its wording/language), never
+  // whether an employer appears at all. A CV that silently drops the earlier
+  // half of a career reads as if the person had only ever held one job.
+  earlierExperience: z.array(z.object({
+    company: z.string().min(1),
+    roleTitle: z.string().min(1),
+    startDate: z.string().nullable().default(null),
+    endDate: z.string().nullable().default(null),
+    summary: z.string().min(1),
+  })).default([]),
+  // GitHub-imported repositories (company === PERSONAL_PROJECT_COMPANY), kept
+  // out of Work Experience and rendered as their own short section.
+  personalProjects: z.array(z.object({
+    name: z.string().min(1),
+    summary: z.string().min(1),
+  })).default([]),
   // Education is never selected/rewritten by the model — it's the user's
   // full academic history, copied verbatim from the master data bank in
   // assembleGeneratedCv. Sorted (in-progress first, then most recent

@@ -10,11 +10,19 @@ import type { GeneratedCv } from '../src/lib/generation-schema'
 // "bad XRef entry" on the first invocation in a fresh worker, confirmed by
 // reproducing it against a byte-identical buffer that always parses fine
 // outside Vitest (plain node/tsx). Retrying the same buffer always succeeds.
-async function parsePdfRetrying(buffer: Buffer) {
+// `expectedMarker` guards against a second, nastier failure mode of the same
+// library: after a failed parse it can return the PREVIOUS document's text
+// instead of throwing. Observed directly — a Portuguese render came back as
+// the English document from the test before it, which would silently turn a
+// broken assertion into a passing one (or a correct one into a failure).
+// Passing a string unique to this document turns that into another retry.
+async function parsePdfRetrying(buffer: Buffer, expectedMarker?: string) {
   let lastError: unknown
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
-      return await pdfParse(buffer)
+      const parsed = await pdfParse(buffer)
+      if (!expectedMarker || parsed.text.includes(expectedMarker)) return parsed
+      lastError = new Error(`pdf-parse returned a stale document (missing marker "${expectedMarker}")`)
     } catch (error) {
       lastError = error
     }
@@ -35,8 +43,10 @@ const content: GeneratedCv = {
   summary: 'Summary text for this role.',
   coverLetter: 'Cover letter text for this role.',
   selectedAchievements: [
-    { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Reduced Cost of Goods Sold by 5%, generating ~R$5MM/year in savings.' },
+    { company: 'Delirio Tropical', roleTitle: 'IT Manager', startDate: '2014-10-01', endDate: null, bullet: 'Reduced Cost of Goods Sold by 5%, generating ~R$5MM/year in savings.' },
   ],
+  earlierExperience: [],
+  personalProjects: [],
   education: [
     { institution: 'UFRJ', degree: 'Engenharia', completedOn: '2010-12-01', inProgress: false },
   ],
@@ -69,6 +79,8 @@ describe('renderCvPdf', () => {
     const longAchievements = Array.from({ length: 20 }, (_, i) => ({
       company: `Company ${i}`,
       roleTitle: `Role ${i}`,
+      startDate: null,
+      endDate: null,
       bullet: 'A fairly long bullet point describing significant impact and measurable results achieved over an extended period of dedicated work.',
     }))
     const longContent: GeneratedCv = { ...content, selectedAchievements: longAchievements }
@@ -79,8 +91,8 @@ describe('renderCvPdf', () => {
   })
 
   it('uses Portuguese section headers (uppercase, per the redesign) when language is pt', async () => {
-    const ptBuffer = await renderCvPdf(profile, { ...content, language: 'pt' })
-    const { text: ptText } = await parsePdfRetrying(ptBuffer)
+    const ptBuffer = await renderCvPdf(profile, { ...content, language: 'pt', headline: 'MARKER-PT-HEADERS' })
+    const { text: ptText } = await parsePdfRetrying(ptBuffer, 'MARKER-PT-HEADERS')
     expect(ptText).toContain('RESUMO PROFISSIONAL')
     expect(ptText).toContain('EXPERIÊNCIA PROFISSIONAL')
     expect(ptText).toContain('FORMAÇÃO ACADÊMICA')
@@ -88,8 +100,8 @@ describe('renderCvPdf', () => {
   })
 
   it('uses English section headers when language is en', async () => {
-    const enBuffer = await renderCvPdf(profile, { ...content, language: 'en' })
-    const { text: enText } = await parsePdfRetrying(enBuffer)
+    const enBuffer = await renderCvPdf(profile, { ...content, language: 'en', headline: 'MARKER-EN-HEADERS' })
+    const { text: enText } = await parsePdfRetrying(enBuffer, 'MARKER-EN-HEADERS')
     expect(enText).toContain('PROFESSIONAL SUMMARY')
     expect(enText).toContain('WORK EXPERIENCE')
     expect(enText).toContain('EDUCATION')
@@ -99,8 +111,8 @@ describe('renderCvPdf', () => {
     const testContent: GeneratedCv = {
       ...content,
       selectedAchievements: [
-        { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Bullet one distinct text.' },
-        { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Bullet two distinct text.' },
+        { company: 'Delirio Tropical', roleTitle: 'IT Manager', startDate: '2014-10-01', endDate: null, bullet: 'Bullet one distinct text.' },
+        { company: 'Delirio Tropical', roleTitle: 'IT Manager', startDate: '2014-10-01', endDate: null, bullet: 'Bullet two distinct text.' },
       ],
     }
     const buffer = await renderCvPdf(profile, testContent)
@@ -120,7 +132,46 @@ describe('renderCvPdf', () => {
     const { text } = await parsePdfRetrying(buffer)
     expect(text).toContain('MBA em Gestao')
     expect(text).toContain('FGV')
-    expect(text).toContain('Em andamento')
+    expect(text).toContain('In progress')
+  })
+
+  it('renders the period under every role in Portuguese when language is pt', async () => {
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, { ...content, language: 'pt', headline: 'MARKER-PT-PERIOD' }), 'MARKER-PT-PERIOD')
+    expect(text).toContain('out/2014')
+  })
+
+  it('renders the period under every role in English when language is en', async () => {
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, { ...content, language: 'en', headline: 'MARKER-EN-PERIOD' }), 'MARKER-EN-PERIOD')
+    expect(text).toContain('Oct 2014')
+  })
+
+  it('shows only the year for a finished degree', async () => {
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, { ...content, headline: 'MARKER-EDU-YEAR' }), 'MARKER-EDU-YEAR')
+    expect(text).toContain('2010')
+    expect(text).not.toContain('2010-12-01')
+  })
+
+  it('renders earlier experience and personal projects in their own sections, never inside work experience', async () => {
+    const full: GeneratedCv = {
+      ...content,
+      language: 'pt',
+      headline: 'MARKER-EARLIER-SECTIONS',
+      earlierExperience: [
+        { company: 'Heliprol', roleTitle: 'Co-founder', startDate: '2010-02-01', endDate: '2012-11-01', summary: 'Fundei uma empresa de taxi aereo.' },
+      ],
+      personalProjects: [{ name: 'cv-tailor', summary: 'Gerador de curriculo ATS-safe.' }],
+    }
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, full), 'MARKER-EARLIER-SECTIONS')
+    expect(text).toContain('EXPERIÊNCIAS ANTERIORES')
+    expect(text).toContain('Fundei uma empresa de taxi aereo.')
+    expect(text).toContain('PROJETOS PESSOAIS')
+    expect(text).toContain('cv-tailor')
+  })
+
+  it('omits the earlier-experience and personal-project headings when there is nothing under them', async () => {
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, { ...content, language: 'pt', headline: 'MARKER-NO-EXTRA-SECTIONS' }), 'MARKER-NO-EXTRA-SECTIONS')
+    expect(text).not.toContain('EXPERIÊNCIAS ANTERIORES')
+    expect(text).not.toContain('PROJETOS PESSOAIS')
   })
 })
 

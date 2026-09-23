@@ -17,8 +17,10 @@ const content: GeneratedCv = {
   summary: 'Summary text for this role.',
   coverLetter: 'Cover letter text for this role.',
   selectedAchievements: [
-    { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Reduced Cost of Goods Sold by 5%, generating ~R$5MM/year in savings.' },
+    { company: 'Delirio Tropical', roleTitle: 'IT Manager', startDate: '2014-10-01', endDate: null, bullet: 'Reduced Cost of Goods Sold by 5%, generating ~R$5MM/year in savings.' },
   ],
+  earlierExperience: [],
+  personalProjects: [],
   education: [
     { institution: 'UFRJ', degree: 'Engenharia', completedOn: '2010-12-01', inProgress: false },
   ],
@@ -72,7 +74,7 @@ describe('renderCvDocx', () => {
     const testContent: GeneratedCv = {
       ...content,
       selectedAchievements: [
-        { company: 'Test Co.', roleTitle: 'Role & Title', bullet: 'Reduced cost by <5%> & saved time.' },
+        { company: 'Test Co.', roleTitle: 'Role & Title', startDate: null, endDate: null, bullet: 'Reduced cost by <5%> & saved time.' },
       ],
     }
     const xml = await documentXmlOf(await renderCvDocx(profile, testContent))
@@ -102,9 +104,9 @@ describe('renderCvDocx', () => {
     const testContent: GeneratedCv = {
       ...content,
       selectedAchievements: [
-        { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Bullet one.' },
-        { company: 'Delirio Tropical', roleTitle: 'IT Manager', bullet: 'Bullet two.' },
-        { company: 'Acme Corp', roleTitle: 'TPM', bullet: 'Bullet three.' },
+        { company: 'Delirio Tropical', roleTitle: 'IT Manager', startDate: '2014-10-01', endDate: null, bullet: 'Bullet one.' },
+        { company: 'Delirio Tropical', roleTitle: 'IT Manager', startDate: '2014-10-01', endDate: null, bullet: 'Bullet two.' },
+        { company: 'Acme Corp', roleTitle: 'TPM', startDate: '2020-01-01', endDate: null, bullet: 'Bullet three.' },
       ],
     }
     const xml = await documentXmlOf(await renderCvDocx(profile, testContent))
@@ -127,10 +129,79 @@ describe('renderCvDocx', () => {
     const xml = await documentXmlOf(await renderCvDocx(profile, testContent))
     expect(xml).toContain('MBA em Gest')
     expect(xml).toContain('FGV')
-    expect(xml).toContain('Em andamento')
+    // The fixture is an English CV, so the in-progress label is English too —
+    // it used to be hardcoded Portuguese regardless of the CV's language.
+    expect(xml).toContain('In progress')
     expect(xml).toContain('Engenharia de Produ')
     expect(xml).toContain('UFRJ')
-    expect(xml).toContain('2010-12-01')
+    // Year only: the stored day/month come from CV parsing and are a
+    // placeholder, so printing them reads as fake precision.
+    expect(plainTextOf(xml)).toContain('2010')
+    expect(plainTextOf(xml)).not.toContain('2010-12-01')
+  })
+
+  it('renders the period under every role, in the requested language, sourced from the achievement dates', async () => {
+    const ptText = plainTextOf(await documentXmlOf(await renderCvDocx(profile, { ...content, language: 'pt' })))
+    expect(ptText).toContain('out/2014 — atual')
+
+    const enText = plainTextOf(await documentXmlOf(await renderCvDocx(profile, { ...content, language: 'en' })))
+    expect(enText).toContain('Oct 2014 — Present')
+  })
+
+  it('omits the period line for a CV generated before dates existed, instead of printing a stray dash', async () => {
+    const dateless: GeneratedCv = {
+      ...content,
+      selectedAchievements: [{ company: 'Acme', roleTitle: 'TPM', startDate: null, endDate: null, bullet: 'Bullet.' }],
+    }
+    const text = plainTextOf(await documentXmlOf(await renderCvDocx(profile, dateless)))
+    expect(text).toContain('TPM - Acme')
+    // No period line at all — not an open-ended one implying a current job.
+    expect(text).not.toContain('Present')
+    expect(text).not.toContain('atual')
+  })
+
+  it('renders earlier experience as a condensed section with its own period', async () => {
+    const withEarlier: GeneratedCv = {
+      ...content,
+      language: 'pt',
+      earlierExperience: [
+        { company: 'Heliprol Táxi Aéreo', roleTitle: 'Co-founder e CEO', startDate: '2010-02-01', endDate: '2012-11-01', summary: 'Fundei uma empresa de táxi aéreo.' },
+      ],
+    }
+    const text = plainTextOf(await documentXmlOf(await renderCvDocx(profile, withEarlier)))
+    expect(text).toContain('EXPERIÊNCIAS ANTERIORES')
+    expect(text).toContain('Co-founder e CEO - Heliprol Táxi Aéreo · fev/2010 — nov/2012')
+    expect(text).toContain('Fundei uma empresa de táxi aéreo.')
+  })
+
+  it('renders personal projects in their own section, never inside work experience', async () => {
+    const withProjects: GeneratedCv = {
+      ...content,
+      language: 'pt',
+      personalProjects: [{ name: 'cv-tailor', summary: 'Gerador de currículo ATS-safe.' }],
+    }
+    const text = plainTextOf(await documentXmlOf(await renderCvDocx(profile, withProjects)))
+    expect(text).toContain('PROJETOS PESSOAIS')
+    expect(text).toContain('cv-tailor — Gerador de currículo ATS-safe.')
+  })
+
+  it('omits the earlier-experience and personal-project headings entirely when there is nothing to put under them', async () => {
+    const text = plainTextOf(await documentXmlOf(await renderCvDocx(profile, { ...content, language: 'pt' })))
+    expect(text).not.toContain('EXPERIÊNCIAS ANTERIORES')
+    expect(text).not.toContain('PROJETOS PESSOAIS')
+  })
+
+  it('stays table-free and text-box-free with the new sections present', async () => {
+    const full: GeneratedCv = {
+      ...content,
+      earlierExperience: [
+        { company: 'Heliprol', roleTitle: 'CEO', startDate: '2010-02-01', endDate: '2012-11-01', summary: 'Summary.' },
+      ],
+      personalProjects: [{ name: 'cv-tailor', summary: 'Summary.' }],
+    }
+    const xml = await documentXmlOf(await renderCvDocx(profile, full))
+    expect(xml).not.toContain('<w:tbl')
+    expect(xml).not.toContain('w:txbxContent')
   })
 
   it('justifies summary and bullet paragraphs', async () => {

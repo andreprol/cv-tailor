@@ -1,5 +1,13 @@
 export type Positioning = 'TPM' | 'AI Product' | 'Web3'
 
+// The company name the GitHub importer stamps on every imported repository.
+// Those rows are real master data and feed skill matching, but they are side
+// projects, not jobs: rendering them inside Work Experience — each with
+// `end_date: null`, i.e. "current" — would read as a person holding twenty-one
+// jobs at once. Lives here, with the data shapes both sides already depend on,
+// rather than in either the importer or the renderer.
+export const PERSONAL_PROJECT_COMPANY = 'Projeto Pessoal'
+
 export interface Profile {
   id: string
   user_id: string

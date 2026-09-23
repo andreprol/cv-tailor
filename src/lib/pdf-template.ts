@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit'
 import type { Profile } from './types'
 import type { GeneratedCv } from './generation-schema'
-import { SECTION_LABELS, groupByRole } from './cv-render-shared'
+import { SECTION_LABELS, formatEducationStatus, formatPeriod, groupRoles } from './cv-render-shared'
 
 // Mirrors the docx-template.ts palette/hierarchy: one accent color, one
 // muted gray, everything else plain black — see the comment there for why.
@@ -25,7 +25,7 @@ function sectionHeading(doc: PDFKit.PDFDocument, text: string): void {
 }
 
 export function sanitizeFilename(name: string): string {
-  const transliterated = name.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const transliterated = name.normalize('NFD').replace(/\p{M}/gu, '')
   const cleaned = transliterated.replace(/[^a-zA-Z0-9-_ ]/g, '').trim()
   return cleaned.length > 0 ? cleaned : 'curriculo'
 }
@@ -55,9 +55,11 @@ export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promi
   doc.font('Helvetica').fontSize(11).fillColor(BLACK).text(content.summary, { align: 'justify' })
 
   sectionHeading(doc, labels.experience)
-  for (const group of groupByRole(content.selectedAchievements)) {
+  for (const group of groupRoles(content.selectedAchievements)) {
     doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(group.roleTitle, { continued: true })
     doc.font('Helvetica-Oblique').fillColor(MUTED_COLOR).text(` - ${group.company}`)
+    const period = formatPeriod(group.startDate, group.endDate, content.language)
+    if (period) doc.font('Helvetica').fontSize(9).fillColor(MUTED_COLOR).text(period)
     doc.fillColor(BLACK)
     for (const bullet of group.bullets) {
       doc.font('Helvetica').fontSize(11).text(`- ${bullet}`, { align: 'justify', indent: 10 })
@@ -65,9 +67,31 @@ export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promi
     doc.moveDown(0.2)
   }
 
+  // Omitted entirely when empty — an empty heading with a divider under it
+  // reads as a formatting bug to a recruiter.
+  if (content.earlierExperience.length > 0) {
+    sectionHeading(doc, labels.earlierExperience)
+    for (const entry of content.earlierExperience) {
+      const period = formatPeriod(entry.startDate, entry.endDate, content.language)
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(entry.roleTitle, { continued: true })
+      doc.font('Helvetica-Oblique').fillColor(MUTED_COLOR).text(` - ${entry.company}${period ? ` · ${period}` : ''}`)
+      doc.font('Helvetica').fontSize(11).fillColor(BLACK).text(entry.summary, { align: 'justify', indent: 10 })
+      doc.moveDown(0.2)
+    }
+  }
+
+  if (content.personalProjects.length > 0) {
+    sectionHeading(doc, labels.projects)
+    for (const project of content.personalProjects) {
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(project.name, { continued: true })
+      doc.font('Helvetica').text(` — ${project.summary}`, { align: 'justify' })
+    }
+    doc.moveDown(0.2)
+  }
+
   sectionHeading(doc, labels.education)
   for (const entry of content.education) {
-    const status = entry.inProgress ? 'Em andamento' : entry.completedOn
+    const status = formatEducationStatus(entry, content.language)
     doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(entry.degree, { continued: true })
     doc.font('Helvetica').fillColor(MUTED_COLOR).text(` — ${entry.institution}${status ? ` — ${status}` : ''}`)
   }

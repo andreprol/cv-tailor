@@ -1,7 +1,7 @@
 import { AlignmentType, BorderStyle, Document, Packer, Paragraph, TextRun } from 'docx'
 import type { Profile } from './types'
 import type { GeneratedCv } from './generation-schema'
-import { SECTION_LABELS, groupByRole } from './cv-render-shared'
+import { SECTION_LABELS, formatEducationStatus, formatPeriod, groupRoles } from './cv-render-shared'
 
 // Deliberately restrained to a single accent color plus one muted gray — the
 // point is visual hierarchy (what a human recruiter scans first), not a
@@ -22,8 +22,28 @@ function sectionHeading(text: string): Paragraph {
   })
 }
 
-function educationParagraph(entry: GeneratedCv['education'][number]): Paragraph {
-  const status = entry.inProgress ? 'Em andamento' : entry.completedOn
+function roleHeading(roleTitle: string, company: string): Paragraph {
+  return new Paragraph({
+    spacing: { before: 200, after: 20 },
+    children: [
+      new TextRun({ text: roleTitle, bold: true }),
+      new TextRun({ text: ` - ${company}`, italics: true, color: MUTED_COLOR }),
+    ],
+  })
+}
+
+// The period gets its own muted line under the role instead of being appended
+// to the heading: it keeps the job title scannable, and an ATS reads it the
+// same way either way (both are plain paragraphs).
+function periodParagraph(period: string): Paragraph {
+  return new Paragraph({
+    spacing: { after: 60 },
+    children: [new TextRun({ text: period, color: MUTED_COLOR, size: 20 })],
+  })
+}
+
+function educationParagraph(entry: GeneratedCv['education'][number], language: GeneratedCv['language']): Paragraph {
+  const status = formatEducationStatus(entry, language)
   return new Paragraph({
     spacing: { after: 60 },
     children: [
@@ -39,21 +59,47 @@ export async function renderCvDocx(profile: Profile, content: GeneratedCv): Prom
     .filter(Boolean)
     .join('   |   ')
 
-  const experienceParagraphs = groupByRole(content.selectedAchievements).flatMap((group) => [
-    new Paragraph({
-      spacing: { before: 200, after: 40 },
-      children: [
-        new TextRun({ text: group.roleTitle, bold: true }),
-        new TextRun({ text: ` - ${group.company}`, italics: true, color: MUTED_COLOR }),
-      ],
-    }),
-    ...group.bullets.map((bullet) => new Paragraph({
-      text: `- ${bullet}`,
-      alignment: AlignmentType.JUSTIFIED,
-      indent: { left: 200 },
-      spacing: { after: 60 },
-    })),
-  ])
+  const experienceParagraphs = groupRoles(content.selectedAchievements).flatMap((group) => {
+    const period = formatPeriod(group.startDate, group.endDate, content.language)
+    return [
+      roleHeading(group.roleTitle, group.company),
+      ...(period ? [periodParagraph(period)] : []),
+      ...group.bullets.map((bullet) => new Paragraph({
+        text: `- ${bullet}`,
+        alignment: AlignmentType.JUSTIFIED,
+        indent: { left: 200 },
+        spacing: { after: 60 },
+      })),
+    ]
+  })
+
+  const earlierParagraphs = content.earlierExperience.flatMap((entry) => {
+    const period = formatPeriod(entry.startDate, entry.endDate, content.language)
+    return [
+      new Paragraph({
+        spacing: { before: 160, after: 20 },
+        children: [
+          new TextRun({ text: entry.roleTitle, bold: true }),
+          new TextRun({ text: ` - ${entry.company}${period ? ` · ${period}` : ''}`, italics: true, color: MUTED_COLOR }),
+        ],
+      }),
+      new Paragraph({
+        text: entry.summary,
+        alignment: AlignmentType.JUSTIFIED,
+        indent: { left: 200 },
+        spacing: { after: 40 },
+      }),
+    ]
+  })
+
+  const projectParagraphs = content.personalProjects.map((project) => new Paragraph({
+    spacing: { after: 60 },
+    alignment: AlignmentType.JUSTIFIED,
+    children: [
+      new TextRun({ text: project.name, bold: true }),
+      new TextRun({ text: ` — ${project.summary}` }),
+    ],
+  }))
 
   const doc = new Document({
     styles: {
@@ -83,8 +129,12 @@ export async function renderCvDocx(profile: Profile, content: GeneratedCv): Prom
           new Paragraph({ text: content.summary, alignment: AlignmentType.JUSTIFIED }),
           sectionHeading(labels.experience),
           ...experienceParagraphs,
+          // Both sections are omitted entirely when empty — an empty heading
+          // with a divider under it reads as a formatting bug to a recruiter.
+          ...(earlierParagraphs.length > 0 ? [sectionHeading(labels.earlierExperience), ...earlierParagraphs] : []),
+          ...(projectParagraphs.length > 0 ? [sectionHeading(labels.projects), ...projectParagraphs] : []),
           sectionHeading(labels.education),
-          ...content.education.map(educationParagraph),
+          ...content.education.map((entry) => educationParagraph(entry, content.language)),
           sectionHeading(labels.skills),
           new Paragraph({ text: content.keywords.join(', '), spacing: { after: 0 } }),
         ],

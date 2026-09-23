@@ -1,3 +1,5 @@
+import { PERSONAL_PROJECT_COMPANY } from './types'
+
 export function extractGithubUsername(url: string): string | null {
   const match = url.match(/github\.com\/([^/?#]+)/i)
   return match ? match[1] : null
@@ -46,7 +48,9 @@ export async function buildGithubImport(username: string, fetchFn: typeof fetch 
   const repos = await fetchGithubRepos(username, fetchFn)
 
   const achievements = repos.map((r) => ({
-    company: 'Projeto Pessoal',
+    // Shared constant: the CV assembler matches on this exact value to keep
+    // repositories out of Work Experience (see assembleGeneratedCv).
+    company: PERSONAL_PROJECT_COMPANY,
     roleTitle: r.name,
     startDate: r.created_at.slice(0, 10),
     endDate: null,
