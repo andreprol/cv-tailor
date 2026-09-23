@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { stripMarkdownFence } from './strip-markdown-fence'
+import { parseModelJson } from './strip-markdown-fence'
 
 export const certificateExtractionSchema = z.object({
   certifications: z.array(z.object({
@@ -12,6 +12,6 @@ export const certificateExtractionSchema = z.object({
 export type CertificateExtraction = z.infer<typeof certificateExtractionSchema>
 
 export function parseCertificateExtraction(raw: string): CertificateExtraction {
-  const json = JSON.parse(stripMarkdownFence(raw))
+  const json = parseModelJson(raw)
   return certificateExtractionSchema.parse(json)
 }

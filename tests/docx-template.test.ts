@@ -25,6 +25,7 @@ const content: GeneratedCv = {
     { institution: 'UFRJ', degree: 'Engenharia', completedOn: '2010-12-01', inProgress: false },
   ],
   keywords: ['Agile', 'SAP Business One', 'Stakeholder Management'],
+  languages: ['English — Fluent (C1)', 'Portuguese — Native'],
   interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
 }
 
@@ -207,6 +208,29 @@ describe('renderCvDocx', () => {
   it('justifies summary and bullet paragraphs', async () => {
     const xml = await documentXmlOf(await renderCvDocx(profile, content))
     expect(xml).toContain('<w:jc w:val="both"/>')
+  })
+
+  it('justifies the education and skills blocks too, not only the summary and bullets', async () => {
+    const xml = await documentXmlOf(await renderCvDocx(profile, content))
+    const paragraphs = xml.match(/<w:p[ >].*?<\/w:p>/gs) ?? []
+    const paragraphWith = (text: string) => paragraphs.find((p) => p.includes(text))
+
+    expect(paragraphWith('Engenharia')).toContain('<w:jc w:val="both"/>')
+    expect(paragraphWith('SAP Business One')).toContain('<w:jc w:val="both"/>')
+  })
+
+  it('renders spoken-language fluency as its own section, sourced from master data rather than from the model keywords', async () => {
+    const text = plainTextOf(await documentXmlOf(await renderCvDocx(profile, content)))
+    expect(text).toContain('LANGUAGES')
+    expect(text).toContain('English — Fluent (C1), Portuguese — Native')
+
+    const ptText = plainTextOf(await documentXmlOf(await renderCvDocx(profile, { ...content, language: 'pt' })))
+    expect(ptText).toContain('IDIOMAS')
+  })
+
+  it('omits the languages heading when the bank has no fluency entry', async () => {
+    const text = plainTextOf(await documentXmlOf(await renderCvDocx(profile, { ...content, languages: [] })))
+    expect(text).not.toContain('LANGUAGES')
   })
 
   it('sets a larger default body font size (docDefaults in styles.xml, applied to every paragraph that does not override it)', async () => {

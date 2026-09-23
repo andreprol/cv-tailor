@@ -1,4 +1,5 @@
 import type { GeneratedCv } from './generation-schema'
+import type { Skill } from './types'
 
 // Shared between docx-template.ts and pdf-template.ts so a future change to
 // labels, grouping, date formatting or the education line only needs to
@@ -11,6 +12,7 @@ export const SECTION_LABELS = {
     projects: 'Projetos Pessoais',
     education: 'Formação Acadêmica',
     skills: 'Competências',
+    languages: 'Idiomas',
   },
   en: {
     summary: 'Professional Summary',
@@ -19,6 +21,7 @@ export const SECTION_LABELS = {
     projects: 'Personal Projects',
     education: 'Education',
     skills: 'Skills',
+    languages: 'Languages',
   },
 } as const
 
@@ -77,6 +80,38 @@ export function formatEducationStatus(entry: GeneratedCv['education'][number], l
   if (entry.inProgress) return STATUS_LABELS[language].inProgress
   if (!entry.completedOn) return null
   return parseIsoDate(entry.completedOn)?.year ?? entry.completedOn
+}
+
+function normalizeCategory(category: string): string {
+  return category.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+}
+
+// Spoken-language fluency lives in the skills table under its own category,
+// stored twice like the rest of the bank: a Portuguese-labelled one and an
+// English-labelled one.
+//
+// 'languages' is deliberately NOT in either list. In this data it is the
+// category holding PROGRAMMING languages (Node.js, Go, TypeScript, C#), so
+// matching it would print the tech stack under the CV's Languages heading.
+const SPOKEN_LANGUAGE_CATEGORIES: Record<RenderLanguage, string[]> = {
+  pt: ['idiomas', 'idioma', 'linguas'],
+  en: ['spoken languages', 'spoken language'],
+}
+
+// Copied verbatim from the master data and never routed through the model.
+// Fluency was previously only reachable as a `keywords` entry, and `keywords`
+// is defined as "terms that appear in BOTH the job ad and the bank" — job ads
+// rarely list "Portuguese — Native", so the line silently vanished from every
+// generated CV.
+export function selectSpokenLanguages(skills: Pick<Skill, 'name' | 'category'>[], language: RenderLanguage): string[] {
+  const named = (categories: string[]) =>
+    skills.filter((skill) => categories.includes(normalizeCategory(skill.category))).map((skill) => skill.name)
+
+  const preferred = named(SPOKEN_LANGUAGE_CATEGORIES[language])
+  if (preferred.length > 0) return preferred
+  // Better a fluency line written in the other language than no fluency line
+  // at all — a bank that only has one of the two variants is normal.
+  return named(SPOKEN_LANGUAGE_CATEGORIES[language === 'pt' ? 'en' : 'pt'])
 }
 
 // Only a TRAILING legal suffix is stripped, and only as a whole word, so

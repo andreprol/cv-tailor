@@ -51,6 +51,7 @@ const content: GeneratedCv = {
     { institution: 'UFRJ', degree: 'Engenharia', completedOn: '2010-12-01', inProgress: false },
   ],
   keywords: ['Agile', 'SAP Business One', 'Stakeholder Management'],
+  languages: ['English — Fluent (C1)', 'Portuguese — Native'],
   interviewQuestions: [{ question: 'Q1', rationale: 'R1' }],
 }
 
@@ -166,6 +167,18 @@ describe('renderCvPdf', () => {
     expect(text).toContain('Fundei uma empresa de taxi aereo.')
     expect(text).toContain('PROJETOS PESSOAIS')
     expect(text).toContain('cv-tailor')
+  })
+
+  it('renders spoken-language fluency as its own section', async () => {
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, { ...content, headline: 'MARKER-LANGUAGES' }), 'MARKER-LANGUAGES')
+    expect(text).toContain('LANGUAGES')
+    expect(text).toContain('Portuguese')
+  })
+
+  it('omits the languages heading when the bank has no fluency entry', async () => {
+    // The marker must not itself contain the string under assertion.
+    const { text } = await parsePdfRetrying(await renderCvPdf(profile, { ...content, languages: [], headline: 'MARKER-FLUENCY-ABSENT' }), 'MARKER-FLUENCY-ABSENT')
+    expect(text).not.toContain('LANGUAGES')
   })
 
   it('omits the earlier-experience and personal-project headings when there is nothing under them', async () => {

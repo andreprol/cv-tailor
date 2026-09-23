@@ -5,6 +5,7 @@ import {
   groupRoles,
   isSameRealJob,
   normalizeCompany,
+  selectSpokenLanguages,
   sortRoleGroupsByRecency,
   splitCurrentAndEarlier,
   type RoleEntry,
@@ -109,6 +110,37 @@ function normalizeNumberGrouping(text: string): string {
   return text.replace(/(\d)[,\s](?=\d)/g, '$1')
 }
 
+const SCALE_WORDS: Record<string, number> = {
+  mil: 1_000, thousand: 1_000, k: 1_000,
+  milhao: 1_000_000, milhoes: 1_000_000, million: 1_000_000, millions: 1_000_000, mm: 1_000_000,
+  bilhao: 1_000_000_000, bilhoes: 1_000_000_000, billion: 1_000_000_000, bn: 1_000_000_000,
+}
+
+// "US$200 mil" and "$200,000" are the same real number written for two
+// different audiences, but digit-for-digit they share nothing — so the
+// anti-hallucination guards read an honest translation as a fabricated
+// number and aborted the whole generation with "possivel alucinacao".
+// Confirmed against the real API: an English CV built from a Portuguese bank
+// hit this on the very first try.
+//
+// The scale word CONSUMES the number it follows, so both spellings collapse
+// to the same canonical value: "US$200 mil" and "$200,000" both become
+// 200000. Appending the expansion instead of replacing it would not work —
+// the bare "200" would still be demanded of the translated text, which no
+// longer contains it as a standalone number.
+function expandScaleWords(text: string): string {
+  return text.replace(/(\d+)\s*(mil|milh[õo]es|milh[ãa]o|thousand|millions?|bilh[õo]es|bilh[ãa]o|billion|mm|bn|k)\b/gi, (match, digits: string, word: string) => {
+    const factor = SCALE_WORDS[word.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')]
+    return factor ? String(Number(digits) * factor) : match
+  })
+}
+
+// Both sides of every numeric comparison go through this, so the check is
+// about the VALUE, not about how either side chose to spell it.
+function normalizeNumbersForComparison(text: string): string {
+  return normalizeNumberGrouping(expandScaleWords(text))
+}
+
 function extractDigits(text: string): string[] {
   return text.match(/\d+/g) ?? []
 }
@@ -143,10 +175,10 @@ function sortEducation(education: Education[]): Education[] {
 // verified bullets/metrics it's allowed to draw from (not a byte-for-byte
 // match — the letter paraphrases freely, only the numbers are checked).
 function assertCoverLetterDigitsAreReal(coverLetter: string, realAchievements: { bullet: string; metric: string | null }[]): void {
-  const trustedText = normalizeNumberGrouping(
+  const trustedText = normalizeNumbersForComparison(
     realAchievements.map((a) => `${a.bullet} ${a.metric ?? ''}`).join(' '),
   )
-  const letterDigits = extractDigits(normalizeNumberGrouping(coverLetter))
+  const letterDigits = extractDigits(normalizeNumbersForComparison(coverLetter))
   const missingDigits = letterDigits.filter((digit) => !containsWholeNumber(trustedText, digit))
   if (missingDigits.length > 0) {
     throw new Error(`Numero na cover letter nao encontrado nas conquistas reais selecionadas (possivel alucinacao): ${missingDigits.join(', ')}.`)
@@ -224,8 +256,8 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
     // (tolerant of reformatting like "30%" -> "30 percent", but catches an
     // altered number like "50%").
     if (real.metric) {
-      const normalizedMetric = normalizeNumberGrouping(real.metric)
-      const normalizedBullet = normalizeNumberGrouping(selected.bullet)
+      const normalizedMetric = normalizeNumbersForComparison(real.metric)
+      const normalizedBullet = normalizeNumbersForComparison(selected.bullet)
       const missingDigits = extractDigits(normalizedMetric).filter((digit) => !containsWholeNumber(normalizedBullet, digit))
       if (missingDigits.length > 0) {
         throw new Error(`Numero/metrica alterado na traducao (possivel alucinacao): conquista "${real.bullet}" tem metrica real "${real.metric}", mas o bullet gerado nao contem ${missingDigits.join(', ')}.`)
@@ -314,6 +346,7 @@ export function assembleGeneratedCv(masterData: MasterDataBank, model: ModelCvRe
       inProgress: e.in_progress,
     })),
     keywords: model.keywords,
+    languages: selectSpokenLanguages(masterData.skills, language),
     interviewQuestions: model.interviewQuestions,
   }
 }

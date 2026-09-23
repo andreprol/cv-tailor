@@ -132,6 +132,41 @@ describe('assembleGeneratedCv', () => {
     expect(() => assembleGeneratedCv(masterData, genuinelyAltered, 'pt')).toThrow(/alucina/)
   })
 
+  it('accepts a scale word expanded during translation ("US$200 mil" -> "$200,000") instead of calling it a hallucination', () => {
+    const scaled: MasterDataBank = {
+      ...masterData,
+      achievements: [
+        { id: 'm1', user_id: '1', company: 'Delirio Tropical', role_title: 'IT Manager', start_date: '2014-10-01', end_date: null, bullet: 'Reduzi o orçamento de US$200 mil para US$25 mil.', metric: 'US$200 mil para US$25 mil', positioning: ['TPM'] },
+      ],
+    }
+    const model = {
+      sufficientMatch: true, matchWarning: null, headline: 'H', summary: 'S',
+      coverLetter: 'I cut the maintenance budget from $200,000 to $25,000.',
+      selectedAchievements: [{ achievementId: 'm1', bullet: 'Cut the budget from $200,000 to $25,000.' }],
+      keywords: [], interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(scaled, model, 'en')).not.toThrow()
+  })
+
+  it('still catches a genuinely different number after the scale-word expansion', () => {
+    const scaled: MasterDataBank = {
+      ...masterData,
+      achievements: [
+        { id: 'm1', user_id: '1', company: 'Delirio Tropical', role_title: 'IT Manager', start_date: '2014-10-01', end_date: null, bullet: 'Reduzi o orçamento de US$200 mil para US$25 mil.', metric: 'US$200 mil', positioning: ['TPM'] },
+      ],
+    }
+    const model = {
+      sufficientMatch: true, matchWarning: null, headline: 'H', summary: 'S',
+      coverLetter: 'CL',
+      // $900,000 is not the real number in any spelling.
+      selectedAchievements: [{ achievementId: 'm1', bullet: 'Cut the budget from $900,000.' }],
+      keywords: [], interviewQuestions: [],
+    } as any
+
+    expect(() => assembleGeneratedCv(scaled, model, 'en')).toThrow(/alucina/)
+  })
+
   it('deduplicates a repeated achievementId instead of rendering the same achievement twice', () => {
     const model = {
       sufficientMatch: true,

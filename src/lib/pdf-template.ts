@@ -93,12 +93,17 @@ export async function renderCvPdf(profile: Profile, content: GeneratedCv): Promi
   for (const entry of content.education) {
     const status = formatEducationStatus(entry, content.language)
     doc.font('Helvetica-Bold').fontSize(11).fillColor(BLACK).text(entry.degree, { continued: true })
-    doc.font('Helvetica').fillColor(MUTED_COLOR).text(` — ${entry.institution}${status ? ` — ${status}` : ''}`)
+    doc.font('Helvetica').fillColor(MUTED_COLOR).text(` — ${entry.institution}${status ? ` — ${status}` : ''}`, { align: 'justify' })
   }
   doc.fillColor(BLACK)
 
   sectionHeading(doc, labels.skills)
-  doc.font('Helvetica').fontSize(11).fillColor(MUTED_COLOR).text(content.keywords.join(', '))
+  doc.font('Helvetica').fontSize(11).fillColor(MUTED_COLOR).text(content.keywords.join(', '), { align: 'justify' })
+
+  if (content.languages.length > 0) {
+    sectionHeading(doc, labels.languages)
+    doc.font('Helvetica').fontSize(11).fillColor(MUTED_COLOR).text(content.languages.join(', '), { align: 'justify' })
+  }
 
   doc.end()
   return done

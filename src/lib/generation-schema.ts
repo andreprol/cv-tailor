@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { stripMarkdownFence } from './strip-markdown-fence'
+import { parseModelJson } from './strip-markdown-fence'
 
 // This is what Claude actually returns. It must cite the REAL achievement it
 // used by id (never invent one) — the id is what proves the underlying fact
@@ -29,7 +29,7 @@ export const modelCvResponseSchema = z.object({
 export type ModelCvResponse = z.infer<typeof modelCvResponseSchema>
 
 export function parseModelCvResponse(raw: string): ModelCvResponse {
-  const json = JSON.parse(stripMarkdownFence(raw))
+  const json = parseModelJson(raw)
   return modelCvResponseSchema.parse(json)
 }
 
@@ -104,6 +104,11 @@ export const generatedCvSchema = z.object({
     inProgress: z.boolean(),
   })).default([]),
   keywords: z.array(z.string().min(1)),
+  // Spoken-language fluency, copied verbatim from the master data's own
+  // category — never selected or rewritten by the model, for the same reason
+  // as education. Defaults to empty so a cv_versions row saved before this
+  // field existed still parses (the section is omitted when empty).
+  languages: z.array(z.string().min(1)).default([]),
   interviewQuestions: z.array(z.object({
     question: z.string().min(1),
     rationale: z.string().min(1),

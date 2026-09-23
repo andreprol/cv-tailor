@@ -5,6 +5,7 @@ import {
   formatPeriod,
   groupRoles,
   normalizeCompany,
+  selectSpokenLanguages,
   splitCurrentAndEarlier,
   type RoleEntry,
 } from '../src/lib/cv-render-shared'
@@ -67,6 +68,38 @@ describe('formatEducationStatus', () => {
 
   it('returns null when a finished degree has no date at all', () => {
     expect(formatEducationStatus({ institution: 'i', degree: 'd', completedOn: null, inProgress: false }, 'pt')).toBeNull()
+  })
+})
+
+describe('selectSpokenLanguages', () => {
+  const skills = [
+    { name: 'Português nativo', category: 'Idiomas' },
+    { name: 'Inglês fluente (C1)', category: 'Idiomas' },
+    { name: 'English — Fluent (C1)', category: 'Spoken Languages' },
+    { name: 'Portuguese — Native', category: 'Spoken Languages' },
+    { name: 'TypeScript', category: 'Languages' },
+    { name: 'Go', category: 'Languages' },
+  ]
+
+  it('picks the fluency entries written in the CV language', () => {
+    expect(selectSpokenLanguages(skills, 'pt')).toEqual(['Português nativo', 'Inglês fluente (C1)'])
+    expect(selectSpokenLanguages(skills, 'en')).toEqual(['English — Fluent (C1)', 'Portuguese — Native'])
+  })
+
+  it('never mistakes the programming-language category for spoken languages', () => {
+    // "Languages" in this bank holds Node.js/Go/TypeScript. Matching it would
+    // print the tech stack under the CV's Languages heading.
+    expect(selectSpokenLanguages(skills, 'en')).not.toContain('TypeScript')
+    expect(selectSpokenLanguages(skills, 'en')).not.toContain('Go')
+  })
+
+  it('falls back to the other variant rather than dropping fluency entirely', () => {
+    const onlyPortuguese = skills.filter((s) => s.category !== 'Spoken Languages')
+    expect(selectSpokenLanguages(onlyPortuguese, 'en')).toEqual(['Português nativo', 'Inglês fluente (C1)'])
+  })
+
+  it('returns empty when the bank has no spoken-language category at all', () => {
+    expect(selectSpokenLanguages([{ name: 'Go', category: 'Languages' }], 'pt')).toEqual([])
   })
 })
 

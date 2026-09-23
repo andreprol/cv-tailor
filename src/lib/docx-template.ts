@@ -46,6 +46,7 @@ function educationParagraph(entry: GeneratedCv['education'][number], language: G
   const status = formatEducationStatus(entry, language)
   return new Paragraph({
     spacing: { after: 60 },
+    alignment: AlignmentType.JUSTIFIED,
     children: [
       new TextRun({ text: entry.degree, bold: true }),
       new TextRun({ text: ` — ${entry.institution}${status ? ` — ${status}` : ''}`, color: MUTED_COLOR }),
@@ -136,7 +137,11 @@ export async function renderCvDocx(profile: Profile, content: GeneratedCv): Prom
           sectionHeading(labels.education),
           ...content.education.map((entry) => educationParagraph(entry, content.language)),
           sectionHeading(labels.skills),
-          new Paragraph({ text: content.keywords.join(', '), spacing: { after: 0 } }),
+          new Paragraph({ text: content.keywords.join(', '), spacing: { after: 0 }, alignment: AlignmentType.JUSTIFIED }),
+          ...(content.languages.length > 0 ? [
+            sectionHeading(labels.languages),
+            new Paragraph({ text: content.languages.join(', '), spacing: { after: 0 }, alignment: AlignmentType.JUSTIFIED }),
+          ] : []),
         ],
       },
     ],
